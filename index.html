@@ -151,7 +151,7 @@ dialog input{width:100%}
 
 <script>
 const FILES=["fixkosten","splitwise","laden","km"];
-const PROV=["IONITY","L-Strom.drive","E.ON Drive","BMW Charging"];
+const PROV=["IONITY","L-Strom.drive","E.ON Drive","BMW Charging","Sonstige"];
 const $=s=>document.querySelector(s);
 const eur=(v,d=0)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:d,maximumFractionDigits:d});
 const num=(v,d=1)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -266,37 +266,36 @@ function rFix(){
 }
 
 function kmPer100(m){
-  // Gesamtwert seit Übernahme: Ladekosten bis Stichtag (alte Auswertung) + Rechnungen danach, geteilt durch gefahrene km
-  const K=D.km||{},bas=K.basis;
-  const e=(K.eintraege||[]).filter(x=>ym(x.datum)<=m).sort((a,b)=>a.datum<b.datum?-1:1);
-  if(!e.length)return null;const cur=e[e.length-1];
-  if(bas&&cur.datum>=bas.datum){
-    const neu=ladenRows().filter(x=>x.datum>bas.datum&&x.datum<=cur.datum).reduce((s,x)=>s+(x.betrag||0),0);
-    const km=cur.km-(bas.km_bei_uebernahme||0),k=bas.kosten_laden+neu;
-    return {euro100:k/km*100,km,kosten:k,aktuell:cur.km,text:"seit Übernahme Juli 2023"};
-  }
-  if(e.length<2)return null;const first=e[0],km=cur.km-first.km;if(km<=0)return null;
-  const k=ladenRows().filter(x=>x.datum>=first.datum&&x.datum<=cur.datum).reduce((s,x)=>s+(x.betrag||0),0);
-  return {euro100:k/km*100,km,kosten:k,aktuell:cur.km,text:"seit "+new Date(first.datum).toLocaleDateString("de-DE")};
+  // Ladekosten (inkl. IONITY-Abo) seit Übernahme ÷ km seit Übernahme; zusätzlich gleitend über 12 Monate
+  const e=(D.km?.eintraege||[]).filter(x=>ym(x.datum)<=m).sort((a,b)=>a.datum<b.datum?-1:1);
+  if(e.length<2)return null;const first=e[0],cur=e[e.length-1];
+  const abo=D.laden?.ionity_abo;
+  const kosten=(von,bis)=>ladenRows().filter(x=>x.datum>von&&x.datum<=bis).reduce((s,x)=>s+(x.betrag||0),0)+(abo&&abo.start>von&&abo.start<=bis?abo.gebuehr:0);
+  const km=cur.km-first.km;if(km<=0)return null;
+  const k=kosten("0000",cur.datum);
+  // gleitend 12 Monate wie in der Excel (Monate, ohne Abogebühr): letzter Stand im Monat vor 12 Monaten
+  const m12=last12(ym(cur.datum))[0],mPrev=(()=>{let [y,mo]=m12.split("-").map(Number);mo--;if(mo<1){mo=12;y--}return `${y}-${String(mo).padStart(2,"0")}`})();
+  const p12=[...e].reverse().find(x=>ym(x.datum)===mPrev);
+  let r12=null;if(p12&&cur.km>p12.km)r12=ladenRows().filter(x=>ym(x.datum)>=m12&&ym(x.datum)<=ym(cur.datum)).reduce((s,x)=>s+(x.betrag||0),0)/(cur.km-p12.km)*100;
+  return {euro100:k/km*100,km,kosten:k,aktuell:cur.km,r12,text:"seit Übernahme "+new Date(first.datum).toLocaleDateString("de-DE",{month:"short",year:"numeric"})};
 }
 function rLaden(m){
   const rows=ladenRows().filter(x=>ym(x.datum)===m);
-  const kwh=rows.reduce((s,x)=>s+(x.kwh||0),0),e=rows.reduce((s,x)=>s+(x.betrag||0),0);
+  const kwh=rows.reduce((s,x)=>s+(x.kwh||0),0),e=rows.reduce((s,x)=>s+(x.betrag||0),0),eK=rows.filter(x=>x.kwh>0).reduce((s,x)=>s+(x.betrag||0),0);
   const abo=D.laden?.ionity_abo;
   const km100=kmPer100(m);
-  const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${eur(km100.kosten)} auf ${km100.km.toLocaleString("de-DE")} km · ${km100.text}`)
-    :((D.km?.eintraege||[]).length?kpi("€ / 100 km","–",`ab dem 2. Kilometerstand · jetzt ${D.km.eintraege.at(-1).km.toLocaleString("de-DE")} km`):"");
+  const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${eur(km100.kosten)} auf ${km100.km.toLocaleString("de-DE")} km · ${km100.text}`+(km100.r12?` · letzte 12 Monate ${num(km100.r12,2)} €`:"")):"";
   $("#kpisLaden").innerHTML=kpi("Ladekosten",eur(ladenPerson(e),2),monthName(m)+(person!=="alle"?" · dein Anteil":""))+kpi("Geladen",num(kwh)+" kWh",`${rows.length} Ladevorgänge`)+
-    kpi("Ø Preis",kwh?num(e/kwh,3)+" €/kWh":"–","alle Anbieter")+kmKpi+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
-  const L=last12(m);const cols=["--s1","--s2","--s3","--s4"];
+    kpi("Ø Preis",kwh?num(eK/kwh,3)+" €/kWh":"–","Vorgänge mit kWh-Angabe")+kmKpi+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
+  const L=last12(m);const cols=["--s1","--s2","--s3","--s4","--s5"];
   $("#legLaden").innerHTML=PROV.map((p,i)=>`<span><i style="background:var(${cols[i]})"></i>${p}</span>`).join("");
   mkChart("cLaden",{type:"bar",data:{labels:L.map(monthShort),datasets:PROV.map((p,i)=>({label:p,
     data:L.map(k=>ladenPerson(ladenRows().filter(x=>ym(x.datum)===k&&x.anbieter===p).reduce((s,x)=>s+(x.betrag||0),0))),
     backgroundColor:css(cols[i]),borderColor:css("--surface"),borderWidth:{top:i<PROV.length-1?2:0},borderRadius:i===PROV.length-1?{topLeft:4,topRight:4}:0,borderSkipped:"bottom"}))},options:baseOpts()});
   const from=L[0];const rs=ladenRows().filter(x=>ym(x.datum)>=from&&ym(x.datum)<=m&&x.status==="erfasst");
   let t=`<thead><tr><th>Anbieter</th><th class="n">Vorgänge</th><th class="n">kWh</th><th class="n">Kosten</th><th class="n">€/kWh</th></tr></thead><tbody>`;
-  PROV.forEach(p=>{const r=rs.filter(x=>x.anbieter===p);if(!r.length)return;const k=r.reduce((s,x)=>s+(x.kwh||0),0),b=r.reduce((s,x)=>s+(x.betrag||0),0);
-    t+=`<tr><td>${p}</td><td class="n">${r.length}</td><td class="n">${num(k)}</td><td class="n">${eur(b,2)}</td><td class="n">${k?num(b/k,3):"–"}</td></tr>`});
+  PROV.forEach(p=>{const r=rs.filter(x=>x.anbieter===p);if(!r.length)return;const k=r.reduce((s,x)=>s+(x.kwh||0),0),b=r.reduce((s,x)=>s+(x.betrag||0),0),bk=r.filter(x=>x.kwh>0).reduce((s,x)=>s+(x.betrag||0),0);
+    t+=`<tr><td>${p}</td><td class="n">${r.length}</td><td class="n">${num(k)}</td><td class="n">${eur(b,2)}</td><td class="n">${k&&p!=="Sonstige"?num(bk/k,3):"–"}</td></tr>`});
   $("#tAnb").innerHTML=t+"</tbody>";
   $("#tLaden").innerHTML=`<thead><tr><th>Datum</th><th>Anbieter</th><th>Ort</th><th class="n">kWh</th><th class="n">Betrag</th><th class="n">€/kWh</th></tr></thead><tbody>`+
     (rows.length?rows.map(x=>`<tr><td>${new Date(x.datum).toLocaleDateString("de-DE")}</td><td>${x.anbieter}</td><td>${x.ort||""}</td><td class="n">${num(x.kwh,3)}</td><td class="n">${eur(x.betrag,2)}</td><td class="n">${x.kwh&&x.betrag?num(x.betrag/x.kwh,3):"–"}</td></tr>`).join(""):`<tr><td colspan="6">Keine Ladevorgänge in diesem Monat.</td></tr>`)+"</tbody>";
