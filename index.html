@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Haushalt Andre & Claudia</title>
 <meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Haushalt">
+<link rel="apple-touch-icon" href="icon.png">
+
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M8 22V14l8-6 8 6v8h-5v-5h-6v5z' fill='white'/></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -94,6 +98,7 @@ dialog input{width:100%}
 <main>
   <div id="empty" class="card empty hidden">
     <p><strong>Noch keine Daten verbunden.</strong></p>
+    <p id="err" class="note" style="color:var(--bad)"></p>
     <p>Die App selbst enthält keine Zahlen. Eure Daten liegen in einem privaten GitHub-Repository und werden mit einem persönlichen Zugangsschlüssel geladen – nur auf diesem Gerät gespeichert.</p>
     <button class="primary" onclick="openSettings()">Datenquelle einrichten</button>
   </div>
@@ -134,9 +139,9 @@ dialog input{width:100%}
 <dialog id="dlg">
   <h2 style="margin:0 0 4px;font-size:17px">Datenquelle</h2>
   <p class="note" style="margin-top:0">Privates GitHub-Repository mit dem Ordner <code>data/</code>. Der Zugangsschlüssel (Fine-grained token, nur „Contents: Read“ für dieses eine Repository) bleibt ausschließlich in diesem Browser gespeichert.</p>
-  <label for="fOwner">GitHub-Benutzer</label><input id="fOwner" placeholder="z. B. zzcrnhm757-bit" autocomplete="off">
-  <label for="fRepo">Daten-Repository</label><input id="fRepo" placeholder="Finanzdaten" autocomplete="off">
-  <label for="fToken">Zugangsschlüssel</label><input id="fToken" type="password" placeholder="github_pat_…" autocomplete="off">
+  <label for="fOwner">GitHub-Benutzer</label><input id="fOwner" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="z. B. zzcrnhm757-bit" autocomplete="off">
+  <label for="fRepo">Daten-Repository</label><input id="fRepo" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Finanzdaten" autocomplete="off">
+  <label for="fToken">Zugangsschlüssel</label><input id="fToken" autocapitalize="off" autocorrect="off" spellcheck="false" type="password" placeholder="github_pat_…" autocomplete="off">
   <div class="row">
     <button onclick="forget()">Auf diesem Gerät löschen</button>
     <button onclick="dlg.close()">Abbrechen</button>
@@ -145,7 +150,7 @@ dialog input{width:100%}
 </dialog>
 
 <script>
-const FILES=["fixkosten","splitwise","laden"];
+const FILES=["fixkosten","splitwise","laden","km"];
 const PROV=["IONITY","L-Strom.drive","E.ON Drive","BMW Charging"];
 const $=s=>document.querySelector(s);
 const eur=(v,d=0)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:d,maximumFractionDigits:d});
@@ -158,7 +163,7 @@ let D={},person="alle",tab="uebersicht",charts={};
 
 function cfg(){try{return JSON.parse(localStorage.getItem("finanzCfg")||"{}")}catch(e){return {}}}
 function openSettings(){const c=cfg();fOwner.value=c.owner||"zzcrnhm757-bit";fRepo.value=c.repo||"Finanzdaten";fToken.value=c.token||"";dlg.showModal()}
-function saveSettings(){try{localStorage.setItem("finanzCfg",JSON.stringify({owner:fOwner.value.trim(),repo:fRepo.value.trim(),token:fToken.value.trim()}))}catch(e){}dlg.close();load()}
+function saveSettings(){cfgOk=true;try{localStorage.setItem("finanzCfg",JSON.stringify({owner:fOwner.value.trim(),repo:fRepo.value.trim(),token:fToken.value.trim()}))}catch(e){cfgOk=false}dlg.close();load()}
 function forget(){try{localStorage.removeItem("finanzCfg")}catch(e){}dlg.close();location.reload()}
 $("#btnSettings").onclick=openSettings;
 
@@ -171,10 +176,18 @@ async function getFile(name){
   if(!r.ok)throw new Error(`${name}: GitHub antwortet ${r.status}`);
   return r.json();
 }
+function explain(e){e=String(e||"");
+  if(e.includes("keine Datenquelle"))return cfgOk?"":"Dieser Browser konnte den Schlüssel nicht speichern (Privater Modus?). Bitte im normalen Safari-Tab öffnen.";
+  if(e.includes("401"))return "GitHub lehnt den Schlüssel ab (401): Schlüssel falsch kopiert oder abgelaufen.";
+  if(e.includes("404"))return "GitHub findet das Repository nicht (404): Name prüfen – oder der Schlüssel hat keinen Zugriff auf »Finanzdaten«.";
+  if(e.includes("403"))return "Zugriff verweigert (403): Beim Schlüssel »Contents: Read-only« setzen.";
+  return "Fehler beim Laden: "+e}
+let cfgOk=true;
 async function load(){
   try{const res=await Promise.all(FILES.map(f=>getFile(f).catch(e=>({error:e.message}))));
     FILES.forEach((f,i)=>D[f]=res[i]);
-    if(FILES.every(f=>D[f].error)){showEmpty(true);return}
+    const errs=FILES.filter(f=>D[f].error&&f!=="km").map(f=>D[f].error);
+    if(FILES.filter(f=>f!=="km").every(f=>D[f].error)){$("#err").textContent=explain(errs[0]);showEmpty(true);return}
     showEmpty(false);init();
   }catch(e){showEmpty(true)}
 }
@@ -252,12 +265,26 @@ function rFix(){
   $("#tFix").innerHTML=h+"</tbody>";
 }
 
+function kmPer100(m){
+  // Kilometerdaten: letzten bekannten Eintrag vor/in diesem Monat und Vormonat finden
+  const eintr=(D.km?.eintraege||[]).filter(e=>ym(e.datum)<=m).sort((a,b)=>a.datum<b.datum?-1:1);
+  if(eintr.length<2)return null;
+  const cur=eintr[eintr.length-1],prev=eintr[eintr.length-2];
+  const diffKm=cur.km-prev.km;if(diffKm<=0)return null;
+  // Ladekosten im Zeitraum zwischen den beiden Einträgen
+  const allRows=ladenRows().filter(x=>ym(x.datum)>ym(prev.datum)&&ym(x.datum)<=ym(cur.datum));
+  const totalKosten=allRows.reduce((s,x)=>s+(x.betrag||0),0);
+  return {euro100:totalKosten/diffKm*100,km:diffKm,von:prev.datum,bis:cur.datum,aktuell:cur.km};
+}
 function rLaden(m){
   const rows=ladenRows().filter(x=>ym(x.datum)===m);
   const kwh=rows.reduce((s,x)=>s+(x.kwh||0),0),e=rows.reduce((s,x)=>s+(x.betrag||0),0);
   const abo=D.laden?.ionity_abo;
+  const km100=kmPer100(m);
+  const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${km100.km.toLocaleString("de-DE")} km gefahren · Stand ${km100.aktuell.toLocaleString("de-DE")} km`)
+    :((D.km?.eintraege||[]).length?kpi("€ / 100 km","–",`ab dem 2. Kilometerstand · jetzt ${D.km.eintraege.at(-1).km.toLocaleString("de-DE")} km`):"");
   $("#kpisLaden").innerHTML=kpi("Ladekosten",eur(ladenPerson(e),2),monthName(m)+(person!=="alle"?" · dein Anteil":""))+kpi("Geladen",num(kwh)+" kWh",`${rows.length} Ladevorgänge`)+
-    kpi("Ø Preis",kwh?num(e/kwh,3)+" €/kWh":"–","alle Anbieter")+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
+    kpi("Ø Preis",kwh?num(e/kwh,3)+" €/kWh":"–","alle Anbieter")+kmKpi+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
   const L=last12(m);const cols=["--s1","--s2","--s3","--s4"];
   $("#legLaden").innerHTML=PROV.map((p,i)=>`<span><i style="background:var(${cols[i]})"></i>${p}</span>`).join("");
   mkChart("cLaden",{type:"bar",data:{labels:L.map(monthShort),datasets:PROV.map((p,i)=>({label:p,
