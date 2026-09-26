@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haushalt Andre & Claudia</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M8 22V14l8-6 8 6v8h-5v-5h-6v5z' fill='white'/></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f3ef;--surface:#fcfcfb;--surface-2:#f0efec;--line:#e2e0da;
+  --text:#0b0b0b;--text-2:#52514e;--text-3:#7a7974;
+  --accent:#2a78d6;--good:#1a7f37;--bad:#c93c3b;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#e34948;
+  --radius:12px;
+}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
+  color-scheme:dark;--bg:#121211;--surface:#1a1a19;--surface-2:#242422;--line:#33332f;
+  --text:#ffffff;--text-2:#c3c2b7;--text-3:#8f8e86;--accent:#3987e5;--good:#3fb950;--bad:#e66767;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--bg:#121211;--surface:#1a1a19;--surface-2:#242422;--line:#33332f;
+  --text:#ffffff;--text-2:#c3c2b7;--text-3:#8f8e86;--accent:#3987e5;--good:#3fb950;--bad:#e66767;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar{max-width:1180px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:18px;margin:0 auto 0 0;font-weight:650;letter-spacing:-.01em}
+select,button,input{font:inherit;color:inherit}
+select,input{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:2px}
+.seg button{border:0;background:transparent;border-radius:7px;padding:5px 11px;color:var(--text-2)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+nav{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;overflow-x:auto}
+nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:10px 12px;color:var(--text-2);white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.kpi .label{color:var(--text-2);font-size:13px}
+.kpi .value{font-size:28px;font-weight:650;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .sub{color:var(--text-3);font-size:12.5px;margin-top:2px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+.card h2{font-size:15px;margin:0 0 2px;font-weight:620}
+.card .hint{color:var(--text-3);font-size:12.5px;margin:0 0 10px}
+.chart{position:relative;height:280px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--text-2);font-weight:560;font-size:12.5px;position:sticky;top:0;background:var(--surface)}
+td.n,th.n{text-align:right}
+tr.cat td{background:var(--surface-2);font-weight:600}
+.tablewrap{max-height:520px;overflow:auto}
+.pill{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:99px;background:var(--surface-2);color:var(--text-2);border:1px solid var(--line)}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12.5px;color:var(--text-2);margin:0 0 8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.empty{padding:40px 16px;text-align:center;color:var(--text-2)}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--text);max-width:460px;width:calc(100% - 32px);padding:20px}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog label{display:block;font-size:13px;color:var(--text-2);margin:10px 0 4px}
+dialog input{width:100%}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.note{font-size:12.5px;color:var(--text-3);margin-top:10px}
+.hidden{display:none!important}
+@media (max-width:560px){.kpi .value{font-size:23px}.chart{height:240px}h1{width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>Haushalt</h1>
+    <label class="hidden" for="month">Monat</label>
+    <select id="month" aria-label="Monat"></select>
+    <div class="seg" role="group" aria-label="Sicht">
+      <button data-p="alle" aria-pressed="true">Gemeinsam</button>
+      <button data-p="andre" aria-pressed="false">Andre</button>
+      <button data-p="claudia" aria-pressed="false">Claudia</button>
+    </div>
+    <button id="btnSettings" title="Datenquelle">⚙︎</button>
+  </div>
+  <nav role="tablist">
+    <button role="tab" data-tab="uebersicht" aria-selected="true">Übersicht</button>
+    <button role="tab" data-tab="fix" aria-selected="false">Fixkosten</button>
+    <button role="tab" data-tab="laden" aria-selected="false">Auto &amp; Laden</button>
+    <button role="tab" data-tab="splitwise" aria-selected="false">Splitwise</button>
+  </nav>
+</header>
+
+<main>
+  <div id="empty" class="card empty hidden">
+    <p><strong>Noch keine Daten verbunden.</strong></p>
+    <p>Die App selbst enthält keine Zahlen. Eure Daten liegen in einem privaten GitHub-Repository und werden mit einem persönlichen Zugangsschlüssel geladen – nur auf diesem Gerät gespeichert.</p>
+    <button class="primary" onclick="openSettings()">Datenquelle einrichten</button>
+  </div>
+
+  <section id="tab-uebersicht">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="card"><h2>Wohin das Geld im Monat geht</h2><p class="hint" id="hintMix"></p><div class="chart"><canvas id="cMix"></canvas></div></div>
+      <div class="card"><h2>Variable Autokosten – letzte 12 Monate</h2><p class="hint">Laden laut Rechnungen + sonstige Autokosten laut Splitwise</p>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Laden</span><span><i style="background:var(--s2)"></i>Sonstiges Auto</span></div>
+        <div class="chart"><canvas id="cAuto"></canvas></div></div>
+    </div>
+  </section>
+
+  <section id="tab-fix" class="hidden">
+    <div class="grid2">
+      <div class="card"><h2>Fixkosten nach Kategorie</h2><p class="hint" id="hintFix"></p><div class="chart" style="height:340px"><canvas id="cFix"></canvas></div></div>
+      <div class="card"><h2>Alle Posten</h2><p class="hint">Monatliche Beträge; Jahreszahlungen anteilig</p><div class="tablewrap"><table id="tFix"></table></div></div>
+    </div>
+  </section>
+
+  <section id="tab-laden" class="hidden">
+    <div class="kpis" id="kpisLaden"></div>
+    <div class="grid2">
+      <div class="card"><h2>Ladekosten pro Monat</h2><p class="hint">Nach Anbieter, laut Rechnungen</p><div class="legend" id="legLaden"></div><div class="chart"><canvas id="cLaden"></canvas></div></div>
+      <div class="card"><h2>Preis pro kWh</h2><p class="hint">Durchschnitt je Anbieter, letzte 12 Monate</p><div class="tablewrap"><table id="tAnb"></table></div></div>
+    </div>
+    <div class="card" style="margin-top:12px"><h2>Ladevorgänge im Monat</h2><div class="tablewrap"><table id="tLaden"></table></div></div>
+  </section>
+
+  <section id="tab-splitwise" class="hidden">
+    <div class="kpis" id="kpisSw"></div>
+    <div class="card"><h2>Einträge im Monat</h2><p class="hint" id="hintSw"></p><div class="tablewrap"><table id="tSw"></table></div></div>
+  </section>
+  <p class="note" id="stand"></p>
+</main>
+
+<dialog id="dlg">
+  <h2 style="margin:0 0 4px;font-size:17px">Datenquelle</h2>
+  <p class="note" style="margin-top:0">Privates GitHub-Repository mit dem Ordner <code>data/</code>. Der Zugangsschlüssel (Fine-grained token, nur „Contents: Read“ für dieses eine Repository) bleibt ausschließlich in diesem Browser gespeichert.</p>
+  <label for="fOwner">GitHub-Benutzer</label><input id="fOwner" placeholder="z. B. zzcrnhm757-bit" autocomplete="off">
+  <label for="fRepo">Daten-Repository</label><input id="fRepo" placeholder="Finanzdaten" autocomplete="off">
+  <label for="fToken">Zugangsschlüssel</label><input id="fToken" type="password" placeholder="github_pat_…" autocomplete="off">
+  <div class="row">
+    <button onclick="forget()">Auf diesem Gerät löschen</button>
+    <button onclick="dlg.close()">Abbrechen</button>
+    <button class="primary" onclick="saveSettings()">Speichern &amp; laden</button>
+  </div>
+</dialog>
+
+<script>
+const FILES=["fixkosten","splitwise","laden"];
+const PROV=["IONITY","L-Strom.drive","E.ON Drive","BMW Charging"];
+const $=s=>document.querySelector(s);
+const eur=(v,d=0)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:d,maximumFractionDigits:d});
+const num=(v,d=1)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{minimumFractionDigits:d,maximumFractionDigits:d});
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ym=d=>d.slice(0,7);
+const monthName=k=>{const [y,m]=k.split("-");return new Date(+y,+m-1,1).toLocaleDateString("de-DE",{month:"long",year:"numeric"})};
+const monthShort=k=>{const [y,m]=k.split("-");return new Date(+y,+m-1,1).toLocaleDateString("de-DE",{month:"short",year:"2-digit"})};
+let D={},person="alle",tab="uebersicht",charts={};
+
+function cfg(){try{return JSON.parse(localStorage.getItem("finanzCfg")||"{}")}catch(e){return {}}}
+function openSettings(){const c=cfg();fOwner.value=c.owner||"zzcrnhm757-bit";fRepo.value=c.repo||"Finanzdaten";fToken.value=c.token||"";dlg.showModal()}
+function saveSettings(){try{localStorage.setItem("finanzCfg",JSON.stringify({owner:fOwner.value.trim(),repo:fRepo.value.trim(),token:fToken.value.trim()}))}catch(e){}dlg.close();load()}
+function forget(){try{localStorage.removeItem("finanzCfg")}catch(e){}dlg.close();location.reload()}
+$("#btnSettings").onclick=openSettings;
+
+async function getFile(name){
+  // 1) lokale Kopie neben der App (für Tests auf dem Mac), 2) privates Repo per GitHub-API
+  try{const r=await fetch(`data/${name}.json`,{cache:"no-store"});if(r.ok)return r.json()}catch(e){}
+  const c=cfg();if(!c.owner||!c.token)throw new Error("keine Datenquelle");
+  const r=await fetch(`https://api.github.com/repos/${c.owner}/${c.repo}/contents/data/${name}.json`,
+    {headers:{Authorization:`Bearer ${c.token}`,Accept:"application/vnd.github.raw+json"},cache:"no-store"});
+  if(!r.ok)throw new Error(`${name}: GitHub antwortet ${r.status}`);
+  return r.json();
+}
+async function load(){
+  try{const res=await Promise.all(FILES.map(f=>getFile(f).catch(e=>({error:e.message}))));
+    FILES.forEach((f,i)=>D[f]=res[i]);
+    if(FILES.every(f=>D[f].error)){showEmpty(true);return}
+    showEmpty(false);init();
+  }catch(e){showEmpty(true)}
+}
+function showEmpty(b){$("#empty").classList.toggle("hidden",!b);document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hidden",b||s.id!=="tab-"+tab))}
+
+/* ---------- Datenlogik ---------- */
+const fixPosten=()=>D.fixkosten?.posten||[];
+const share=(a,c)=>person==="andre"?a:person==="claudia"?c:a+c;
+function fixTotal(){return fixPosten().reduce((s,p)=>s+share(p.andre,p.claudi),0)}
+function einnahmen(){const e=D.fixkosten?.einnahmen||{};const a=(e.andre_netto||0)+(e.mieteinnahme||0),c=e.claudi_netto||0;return share(a,c)}
+const swRows=()=>(D.splitwise?.eintraege||[]);
+const ladenRows=()=>(D.laden?.vorgaenge||[]);
+// Anteil Andre an Ladekosten = Verhältnis der Splitwise-Ladebuchungen der letzten 12 Monate
+function ladenQuote(){const r=swRows().filter(x=>x.typ==="Laden").slice(-60);const k=r.reduce((s,x)=>s+x.kosten,0),a=r.reduce((s,x)=>s+x.anteil_andre,0);return k?a/k:0.5}
+function ladenMonat(m){return ladenRows().filter(x=>ym(x.datum)===m).reduce((s,x)=>s+(x.betrag||0),0)}
+function ladenPerson(v){const q=ladenQuote();return person==="andre"?v*q:person==="claudia"?v*(1-q):v}
+function swMonat(m,typ){return swRows().filter(x=>ym(x.datum)===m&&x.typ===typ).reduce((s,x)=>s+share(x.anteil_andre,x.anteil_claudia),0)}
+function months(){const s=new Set([...swRows().map(x=>ym(x.datum)),...ladenRows().map(x=>ym(x.datum))]);
+  const now=new Date();s.add(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`);return [...s].sort()}
+function last12(m){const out=[];let [y,mo]=m.split("-").map(Number);for(let i=11;i>=0;i--){let yy=y,mm=mo-i;while(mm<1){mm+=12;yy--}out.push(`${yy}-${String(mm).padStart(2,"0")}`)}return out}
+
+/* ---------- Rendering ---------- */
+function init(){
+  const ms=months();const sel=$("#month");const cur=sel.value;
+  sel.innerHTML=ms.slice().reverse().map(m=>`<option value="${m}">${monthName(m)}</option>`).join("");
+  sel.value=cur&&ms.includes(cur)?cur:ms[ms.length-1];
+  const st=FILES.map(f=>D[f]?.stand?`${f}: ${new Date(D[f].stand).toLocaleString("de-DE",{dateStyle:"short",timeStyle:"short"})}`:null).filter(Boolean);
+  $("#stand").textContent="Datenstand – "+st.join(" · ");
+  render();
+}
+function kpi(label,value,sub,cls=""){return `<div class="card kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`}
+function render(){const m=$("#month").value;if(!m)return;
+  ({uebersicht:rUeb,fix:rFix,laden:rLaden,splitwise:rSw})[tab](m)}
+
+function mkChart(id,conf){charts[id]?.destroy();charts[id]=new Chart(document.getElementById(id),conf);return charts[id]}
+function baseOpts(extra={}){const t2=css("--text-2"),ln=css("--line");return Object.assign({responsive:true,maintainAspectRatio:false,
+  interaction:{mode:"index",intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y??c.parsed.x,2)}`}}},
+  scales:{x:{grid:{display:false},ticks:{color:t2},stacked:true},y:{grid:{color:ln},border:{display:false},ticks:{color:t2,callback:v=>eur(v)},stacked:true}}},extra)}
+
+function rUeb(m){
+  const ein=einnahmen(),fix=fixTotal(),lad=ladenPerson(ladenMonat(m)),auto=swMonat(m,"Ausgabe");
+  const frei=ein-fix-lad-auto;
+  const who=person==="alle"?"Andre + Claudia":person==="andre"?"Andre":"Claudia";
+  $("#kpis").innerHTML=kpi("Einnahmen (netto)",eur(ein),who+(person!=="claudia"?" · inkl. Mieteinnahme":""))+
+    kpi("Fixkosten",eur(fix),`${fixPosten().length} Posten laut Kostenberechnung`)+
+    kpi("Laden",eur(lad),person==="alle"?`${monthName(m)} · laut Rechnungen`:`Anteil ${Math.round((person==="andre"?ladenQuote():1-ladenQuote())*100)} % laut Splitwise`)+
+    kpi("Sonstiges Auto",eur(auto),"Splitwise ohne Laden & Ausgleich")+
+    kpi("Frei verfügbar",eur(frei),"Einnahmen − alle Kosten",frei>=0?"pos":"neg");
+  // Aufteilung als horizontale Balken (Kategorie-Summen)
+  const kat={};fixPosten().forEach(p=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(p.andre,p.claudi));
+  kat["Laden"]=(kat["Laden"]||0)+lad;kat["Sonstiges Auto"]=auto;
+  const ent=Object.entries(kat).filter(([,v])=>v>0.5).sort((a,b)=>b[1]-a[1]);
+  $("#cMix").parentElement.style.height=Math.max(240,ent.length*30+50)+"px";
+  $("#hintMix").textContent=`${monthName(m)} · ${eur(ent.reduce((s,e)=>s+e[1],0))} gesamt`;
+  mkChart("cMix",{type:"bar",data:{labels:ent.map(e=>e[0]),datasets:[{label:"Betrag",data:ent.map(e=>e[1]),backgroundColor:css("--s1"),borderRadius:4,barThickness:16}]},
+    options:baseOpts({indexAxis:"y",scales:{x:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}},y:{grid:{display:false},ticks:{color:css("--text"),autoSkip:false}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>" "+eur(c.parsed.x,2)}}}})});
+  const L=last12(m);
+  mkChart("cAuto",{type:"bar",data:{labels:L.map(monthShort),datasets:[
+    {label:"Laden",data:L.map(k=>ladenPerson(ladenMonat(k))),backgroundColor:css("--s1"),borderRadius:{topLeft:0,topRight:0},borderSkipped:false,borderColor:css("--surface"),borderWidth:{top:2}},
+    {label:"Sonstiges Auto",data:L.map(k=>swMonat(k,"Ausgabe")),backgroundColor:css("--s2"),borderRadius:{topLeft:4,topRight:4},borderSkipped:"bottom"}]},options:baseOpts()});
+}
+
+function rFix(){
+  const kat={};fixPosten().forEach(p=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(p.andre,p.claudi));
+  const ent=Object.entries(kat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  $("#cFix").parentElement.style.height=Math.max(240,ent.length*30+50)+"px";
+  $("#hintFix").textContent=`${eur(fixTotal())} pro Monat · ${eur(fixTotal()*12)} im Jahr`;
+  mkChart("cFix",{type:"bar",data:{labels:ent.map(e=>e[0]),datasets:[{label:"Monatlich",data:ent.map(e=>e[1]),backgroundColor:css("--s1"),borderRadius:4,barThickness:18}]},
+    options:baseOpts({indexAxis:"y",scales:{x:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}},y:{grid:{display:false},ticks:{color:css("--text"),autoSkip:false}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>" "+eur(c.parsed.x,2)}}}})});
+  let h=`<thead><tr><th>Posten</th><th>Anbieter</th><th class="n">Andre</th><th class="n">Claudia</th><th class="n">Gesamt</th><th>Zahlt</th></tr></thead><tbody>`,last=null;
+  fixPosten().forEach(p=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="6">${p.kategorie}</td></tr>`;last=p.kategorie}
+    h+=`<tr><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}</td><td>${p.anbieter||""}</td><td class="n">${eur(p.andre,2)}</td><td class="n">${eur(p.claudi,2)}</td><td class="n">${eur(p.gesamt,2)}</td><td>${p.wer_zahlt||""}</td></tr>`});
+  $("#tFix").innerHTML=h+"</tbody>";
+}
+
+function rLaden(m){
+  const rows=ladenRows().filter(x=>ym(x.datum)===m);
+  const kwh=rows.reduce((s,x)=>s+(x.kwh||0),0),e=rows.reduce((s,x)=>s+(x.betrag||0),0);
+  const abo=D.laden?.ionity_abo;
+  $("#kpisLaden").innerHTML=kpi("Ladekosten",eur(ladenPerson(e),2),monthName(m)+(person!=="alle"?" · dein Anteil":""))+kpi("Geladen",num(kwh)+" kWh",`${rows.length} Ladevorgänge`)+
+    kpi("Ø Preis",kwh?num(e/kwh,3)+" €/kWh":"–","alle Anbieter")+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
+  const L=last12(m);const cols=["--s1","--s2","--s3","--s4"];
+  $("#legLaden").innerHTML=PROV.map((p,i)=>`<span><i style="background:var(${cols[i]})"></i>${p}</span>`).join("");
+  mkChart("cLaden",{type:"bar",data:{labels:L.map(monthShort),datasets:PROV.map((p,i)=>({label:p,
+    data:L.map(k=>ladenPerson(ladenRows().filter(x=>ym(x.datum)===k&&x.anbieter===p).reduce((s,x)=>s+(x.betrag||0),0))),
+    backgroundColor:css(cols[i]),borderColor:css("--surface"),borderWidth:{top:i<PROV.length-1?2:0},borderRadius:i===PROV.length-1?{topLeft:4,topRight:4}:0,borderSkipped:"bottom"}))},options:baseOpts()});
+  const from=L[0];const rs=ladenRows().filter(x=>ym(x.datum)>=from&&ym(x.datum)<=m&&x.status==="erfasst");
+  let t=`<thead><tr><th>Anbieter</th><th class="n">Vorgänge</th><th class="n">kWh</th><th class="n">Kosten</th><th class="n">€/kWh</th></tr></thead><tbody>`;
+  PROV.forEach(p=>{const r=rs.filter(x=>x.anbieter===p);if(!r.length)return;const k=r.reduce((s,x)=>s+(x.kwh||0),0),b=r.reduce((s,x)=>s+(x.betrag||0),0);
+    t+=`<tr><td>${p}</td><td class="n">${r.length}</td><td class="n">${num(k)}</td><td class="n">${eur(b,2)}</td><td class="n">${k?num(b/k,3):"–"}</td></tr>`});
+  $("#tAnb").innerHTML=t+"</tbody>";
+  $("#tLaden").innerHTML=`<thead><tr><th>Datum</th><th>Anbieter</th><th>Ort</th><th class="n">kWh</th><th class="n">Betrag</th><th class="n">€/kWh</th></tr></thead><tbody>`+
+    (rows.length?rows.map(x=>`<tr><td>${new Date(x.datum).toLocaleDateString("de-DE")}</td><td>${x.anbieter}</td><td>${x.ort||""}</td><td class="n">${num(x.kwh,3)}</td><td class="n">${eur(x.betrag,2)}</td><td class="n">${x.kwh&&x.betrag?num(x.betrag/x.kwh,3):"–"}</td></tr>`).join(""):`<tr><td colspan="6">Keine Ladevorgänge in diesem Monat.</td></tr>`)+"</tbody>";
+}
+
+function rSw(m){
+  const rows=swRows().filter(x=>ym(x.datum)===m);
+  const saldo=swRows().reduce((s,x)=>s+x.saldo_andre,0);
+  const ausg=rows.filter(x=>x.typ!=="Ausgleich").reduce((s,x)=>s+share(x.anteil_andre,x.anteil_claudia),0);
+  $("#kpisSw").innerHTML=kpi("Ausgaben im Monat",eur(ausg,2),person==="alle"?"gesamt":"Anteil "+(person==="andre"?"Andre":"Claudia"))+
+    kpi("Offener Saldo",eur(Math.abs(saldo),2),Math.abs(saldo)<0.01?"ausgeglichen":saldo>0?"Claudia schuldet Andre":"Andre schuldet Claudia")+
+    kpi("Einträge",rows.length,monthName(m));
+  $("#hintSw").textContent=`Quelle: ${D.splitwise?.quelle||"Splitwise"} · Ausgleichszahlungen zählen nicht als Ausgabe`;
+  $("#tSw").innerHTML=`<thead><tr><th>Datum</th><th>Beschreibung</th><th>Typ</th><th class="n">Betrag</th><th class="n">Andre</th><th class="n">Claudia</th><th>Bezahlt</th></tr></thead><tbody>`+
+    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${new Date(x.datum).toLocaleDateString("de-DE")}</td><td>${x.beschreibung}</td><td><span class="pill">${x.typ}</span></td><td class="n">${eur(x.kosten,2)}</td><td class="n">${eur(x.anteil_andre,2)}</td><td class="n">${eur(x.anteil_claudia,2)}</td><td>${x.bezahlt_von}</td></tr>`).join(""):`<tr><td colspan="7">Keine Einträge in diesem Monat.</td></tr>`)+"</tbody>";
+}
+
+/* ---------- Bedienung ---------- */
+$("#month").onchange=render;
+document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{person=b.dataset.p;document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hidden",s.id!=="tab-"+tab));render()});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
+load();
+</script>
+</body>
+</html>
