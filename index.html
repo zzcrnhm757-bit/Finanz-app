@@ -266,22 +266,19 @@ function rFix(){
 }
 
 function kmPer100(m){
-  // Kilometerdaten: letzten bekannten Eintrag vor/in diesem Monat und Vormonat finden
-  const eintr=(D.km?.eintraege||[]).filter(e=>ym(e.datum)<=m).sort((a,b)=>a.datum<b.datum?-1:1);
-  if(eintr.length<2)return null;
-  const cur=eintr[eintr.length-1],prev=eintr[eintr.length-2];
-  const diffKm=cur.km-prev.km;if(diffKm<=0)return null;
-  // Ladekosten im Zeitraum zwischen den beiden Einträgen
-  const allRows=ladenRows().filter(x=>ym(x.datum)>ym(prev.datum)&&ym(x.datum)<=ym(cur.datum));
-  const totalKosten=allRows.reduce((s,x)=>s+(x.betrag||0),0);
-  return {euro100:totalKosten/diffKm*100,km:diffKm,von:prev.datum,bis:cur.datum,aktuell:cur.km};
+  // Fortlaufend: Ladekosten seit dem ersten Kilometerstand ÷ gefahrene km seitdem
+  const e=(D.km?.eintraege||[]).filter(x=>ym(x.datum)<=m).sort((a,b)=>a.datum<b.datum?-1:1);
+  if(e.length<2)return null;
+  const first=e[0],cur=e[e.length-1],km=cur.km-first.km;if(km<=0)return null;
+  const k=ladenRows().filter(x=>x.datum>=first.datum&&x.datum<=cur.datum).reduce((s,x)=>s+(x.betrag||0),0);
+  return {euro100:k/km*100,km,von:first.datum,aktuell:cur.km,kosten:k};
 }
 function rLaden(m){
   const rows=ladenRows().filter(x=>ym(x.datum)===m);
   const kwh=rows.reduce((s,x)=>s+(x.kwh||0),0),e=rows.reduce((s,x)=>s+(x.betrag||0),0);
   const abo=D.laden?.ionity_abo;
   const km100=kmPer100(m);
-  const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${km100.km.toLocaleString("de-DE")} km gefahren · Stand ${km100.aktuell.toLocaleString("de-DE")} km`)
+  const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${eur(km100.kosten)} auf ${km100.km.toLocaleString("de-DE")} km seit ${new Date(km100.von).toLocaleDateString("de-DE")}`)
     :((D.km?.eintraege||[]).length?kpi("€ / 100 km","–",`ab dem 2. Kilometerstand · jetzt ${D.km.eintraege.at(-1).km.toLocaleString("de-DE")} km`):"");
   $("#kpisLaden").innerHTML=kpi("Ladekosten",eur(ladenPerson(e),2),monthName(m)+(person!=="alle"?" · dein Anteil":""))+kpi("Geladen",num(kwh)+" kWh",`${rows.length} Ladevorgänge`)+
     kpi("Ø Preis",kwh?num(e/kwh,3)+" €/kWh":"–","alle Anbieter")+kmKpi+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
