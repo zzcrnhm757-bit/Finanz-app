@@ -218,6 +218,7 @@ dialog select,dialog input,dialog textarea{width:100%}
 
   <section id="tab-laden" class="hidden">
     <div class="kpis" id="kpisLaden"></div>
+    <div class="card full hidden" id="cardBord"><h2>Verbrauch laut Bordcomputer</h2><p class="hint" id="hintBord"></p><div class="kpis" id="kpisBord" style="margin:0"></div></div>
     <div class="grid2">
       <div class="card"><h2>Ladekosten pro Monat</h2><p class="hint">Nach Anbieter, laut Rechnungen</p><div class="legend" id="legLaden"></div><div class="chart"><canvas id="cLaden"></canvas></div></div>
       <div class="card"><h2>Preis pro kWh</h2><p class="hint">Durchschnitt je Anbieter, letzte 12 Monate</p><div class="tablewrap"><table id="tAnb" class="resp"></table></div></div>
@@ -465,6 +466,7 @@ function rLaden(m){
   const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${eur(km100.kosten)} auf ${km100.km.toLocaleString("de-DE")} km · ${km100.text}`+(km100.r12?` · letzte 12 Monate ${num(km100.r12,2)} €`:"")):"";
   $("#kpisLaden").innerHTML=kpi("Ladekosten",eur(ladenPerson(e),2),monthName(m)+(person!=="alle"?" · dein Anteil":""))+kpi("Geladen",num(kwh)+" kWh",`${rows.length} Ladevorgänge`)+
     kpi("Ø Preis",kwh?num(eK/kwh,3)+" €/kWh":"–","Vorgänge mit kWh-Angabe")+kmKpi+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
+  rBord();
   const L=last12(m);const cols=["--s1","--s2","--s3","--s4","--s5"];
   $("#legLaden").innerHTML=PROV.map((p,i)=>`<span><i style="background:var(${cols[i]})"></i>${p}</span>`).join("");
   mkChart("cLaden",{type:"bar",data:{labels:L.map(monthShort),datasets:PROV.map((p,i)=>({label:p,
@@ -743,6 +745,23 @@ function rRb(m){
   h+=`<tr class="cat"><td>Ø pro Monat</td><td class="n">${eur(av(r=>r.fix))}</td><td class="n">${eur(av(r=>r.laden+r.auto))}</td><td class="n">${eur(av(r=>r.alltag+r.hobby+r.anlass))}</td><td class="n">${eur(avg)}</td><td></td><td></td></tr>`;
   $("#tRb").innerHTML=h+"</tbody>";labelTable($("#tRb"))}
 
+
+
+function rBord(){
+  const b=(D.km?.bordcomputer||[]).at(-1);$("#cardBord").classList.toggle("hidden",!b);if(!b)return;
+  const VERLUST=0.10; // Ladeverluste (Annahme ~10 %)
+  const bis=b.datum,rs=ladenRows().filter(x=>x.datum<=bis),kwhR=rs.reduce((s,x)=>s+(x.kwh||0),0),ohne=rs.filter(x=>!x.kwh&&x.betrag>0).length;
+  const eK=rs.filter(x=>x.kwh>0).reduce((s,x)=>s+(x.betrag||0),0),preis=kwhR?eK/kwhR:0;
+  const eOhne=rs.filter(x=>!x.kwh&&x.betrag>0).reduce((s,x)=>s+x.betrag,0),schaetz=preis?eOhne/preis:0;
+  const verbr=b.km*b.verbrauch_kwh_100km/100,netz=verbr*(1+VERLUST),anteil=kwhR/netz;
+  const kosten=rs.reduce((s,x)=>s+(x.betrag||0),0);
+  $("#hintBord").textContent=`„${b.zeitraum}“ bis ${new Date(b.datum).toLocaleDateString("de-DE")} · ${b.km.toLocaleString("de-DE")} km · Fahrzeit ${b.fahrzeit} · Ladeverluste mit ~${VERLUST*100} % angenommen`;
+  $("#kpisBord").innerHTML=kpi("Ø Verbrauch",num(b.verbrauch_kwh_100km,1)+" kWh/100 km","aus der Batterie, ohne Ladeverluste")+
+    kpi("Verbraucht gesamt",`≈ ${num(verbr,0)} kWh`,`am Ladepunkt ≈ ${num(netz,0)} kWh inkl. Verluste`+(b.rekuperiert_kwh?` · ${num(b.rekuperiert_kwh,0)} kWh zurückgewonnen (Rekuperation)`:""))+
+    kpi("Laut Ladehistorie",`≈ ${num(kwhR+schaetz,0)} kWh`,`${num(kwhR,0)} kWh belegt`+(ohne?` + ≈ ${num(schaetz,0)} kWh geschätzt aus ${ohne} Rechnungen ohne kWh (${eur(eOhne)})`:""))+
+    kpi("Abgleich",`≈ ${num((kwhR+schaetz)/netz*100,0)} %`,`der benötigten Energie ist erfasst · Lücke ≈ ${num(Math.max(0,netz-kwhR-schaetz),0)} kWh`,(kwhR+schaetz)/netz>0.9?"pos":"neg")+
+    kpi("Energiekosten pro 100 km",num(kosten/b.km*100,2)+" €",`real bezahlt, ohne IONITY-Abo · Ø ${num(preis,2)} €/kWh`);
+}
 
 /* ---------- Jahresrückblick ---------- */
 function rJahr(y){
