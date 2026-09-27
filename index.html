@@ -560,8 +560,8 @@ function rVar(m){
   $("#varBereich").querySelectorAll("button").forEach(b=>b.onclick=()=>{varB=b.dataset.b;rVar(m)});
   const q=($("#qVar").value||"").trim().toLowerCase();
   const rows=varRows().filter(x=>ym(x.datum)===m&&(varB==="alle"||bereichOf(x.gruppe)===varB)&&(!q||[x.beschreibung,x.kategorie,x.gruppe].join(" ").toLowerCase().includes(q)));
-  $("#tVar").innerHTML=`<thead><tr><th>Eintrag</th><th class="n">Betrag</th><th class="n">Andre</th><th class="n">Claudia</th></tr></thead><tbody>`+
-    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.beschreibung}<span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · ${x.gruppe}${x.kategorie?" · "+x.kategorie:""} · bezahlt von ${x.bezahlt_von}</span></td><td class="n">${eur(x.kosten,2)}</td><td class="n">${eur(x.anteil_andre,2)}</td><td class="n">${eur(x.anteil_claudia,2)}</td></tr>`).join(""):`<tr><td colspan="4">Keine Einträge.</td></tr>`)+"</tbody>";
+  $("#tVar").innerHTML=`<thead><tr><th>Eintrag</th><th class="n">Euer Anteil</th><th class="n">Andre</th><th class="n">Claudia</th></tr></thead><tbody>`+
+    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.beschreibung}<span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · ${x.gruppe}${x.mit_claudia===false?" (mit Freunden)":""}${x.kategorie?" · "+x.kategorie:""} · Beleg ${eur(x.kosten,2)}, bezahlt von ${x.bezahlt_von}</span></td><td class="n">${eur(x.anteil_andre+x.anteil_claudia,2)}</td><td class="n">${eur(x.anteil_andre,2)}</td><td class="n">${eur(x.anteil_claudia,2)}</td></tr>`).join(""):`<tr><td colspan="4">Keine Einträge.</td></tr>`)+"</tbody>";
   labelTable($("#tVar"))}
 
 /* ---------- Bedienung ---------- */
