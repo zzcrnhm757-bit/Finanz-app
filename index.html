@@ -599,7 +599,8 @@ function kSum(m,b){return kRows().filter(x=>ym(x.datum)===m&&kBer(x)===b).reduce
 function rKonto(m){
   if(!kRows().length){$("#kpisKonto").innerHTML=kpi("Andres Konto","–","Noch keine Kontoauszüge eingelesen.");return}
   const ms=[...new Set(kRows().map(x=>ym(x.datum)))].sort(),bis=ms.at(-1);
-  $("#hintKonto").textContent=`Nur Andre · ING-Girokonto · eingelesen bis ${monthName(bis)} · Ausgaben, die schon in Splitwise stehen, zählen dort (nur dein Anteil) und hier separat`;
+  const lk=(D.konto_andre.luecken||[]).length?` · ⚠︎ Auszug fehlt ${D.konto_andre.luecken.join(", ")}`:"";
+  $("#hintKonto").textContent=`Nur Andre · ING-Girokonto · eingelesen ${monthName(ms[0])} bis ${monthName(bis)}${lk} · Ausgaben, die schon in Splitwise stehen, zählen dort (nur dein Anteil) und hier separat`;
   if(!ms.includes(m)){const ask=m;m=ms.filter(k=>k<=ask).at(-1)||bis;
     $("#hintKonto").textContent=`Für ${monthName(ask)} liegt noch kein Kontoauszug vor – angezeigt wird ${monthName(m)}, der letzte eingelesene Monat. Nur Andre · ING-Girokonto`}
   const ein=kSum(m,"Einnahme"),fix=-kSum(m,"Fixkosten"),lad=-kSum(m,"Laden"),aus=-kSum(m,"Ausgabe"),sw=-kSum(m,"Splitwise"),aus2=-kSum(m,"Ausgleich");
