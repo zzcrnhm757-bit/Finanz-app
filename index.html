@@ -126,6 +126,7 @@ dialog select,dialog input,dialog textarea{width:100%}
     <button role="tab" data-tab="uebersicht" aria-selected="true">Übersicht</button>
     <button role="tab" data-tab="rueckblick" aria-selected="false">Rückblick</button>
     <button role="tab" data-tab="fix" aria-selected="false">Fixkosten</button>
+    <button role="tab" data-tab="mutti" aria-selected="false">Darlehen Mutti</button>
     <button role="tab" data-tab="variabel" aria-selected="false">Variabel</button>
     <button role="tab" data-tab="laden" aria-selected="false">Auto &amp; Laden</button>
     <button role="tab" data-tab="splitwise" aria-selected="false">Splitwise</button>
@@ -172,9 +173,20 @@ dialog select,dialog input,dialog textarea{width:100%}
       <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
       <input type="search" id="qFix" placeholder="Posten suchen (Name, Anbieter, Kategorie)" style="width:100%;margin-bottom:8px">
       <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
-    <div class="card full" id="muttiCard"><div class="toolbar"><h2>Schulden bei Mutti</h2><button class="btn-s" onclick="openMutti()">Startsaldo ✎</button></div>
-      <p class="hint">Tilgung = monatliche Rate + der Teil von Verträgen, den Mutti mitnutzt</p><div class="kpis" id="kpisMutti" style="margin:0"></div><p class="note" id="muttiInfo"></p></div>
+    <p class="note">Muttis Anteile (Spalte „Mutti“) werden mit ihrem Darlehen verrechnet – Details im Tab „Darlehen Mutti“.</p>
     <div class="card full"><h2>Änderungsprotokoll</h2><p class="hint">Neueste zuerst</p><ol class="log" id="logFix" reversed></ol></div>
+  </section>
+
+  <section id="tab-mutti" class="hidden">
+    <p class="hint" id="hintMutti" style="margin:0 0 10px"></p>
+    <div class="kpis" id="kpisMutti"></div>
+    <div class="grid2">
+      <div class="card"><h2>Verlauf</h2><p class="hint">Restschuld nach Verrechnung und ETF-Guthaben für Mutti · gestrichelt = Ausblick</p><div class="chart"><canvas id="cMutti"></canvas></div></div>
+      <div class="card"><div class="toolbar"><h2>Monatliche Verrechnung</h2></div><p class="hint">Verträge, die Andre zahlt und die Mutti mitnutzt</p><div class="tablewrap"><table id="tMuttiPosten" class="resp"></table></div>
+        <h2 style="margin-top:16px">ETF für Mutti</h2><p class="hint" id="hintEtf"></p><div class="tablewrap"><table id="tEtf" class="resp"></table></div>
+        <div class="row" style="justify-content:flex-start"><button class="btn-s" onclick="openEtf()">ETF-Stand eintragen ✎</button><button class="btn-s" onclick="openMuttiStart()">Grunddaten ✎</button></div></div>
+    </div>
+    <div class="card full"><h2>Monat für Monat</h2><div class="tablewrap"><table id="tMuttiMon" class="resp"></table></div></div>
   </section>
 
   <section id="tab-variabel" class="hidden">
@@ -337,7 +349,7 @@ function init(){
 }
 function kpi(label,value,sub,cls=""){return `<div class="card kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`}
 function render(){const m=$("#month").value;if(!m)return;
-  ({uebersicht:rUeb,rueckblick:rRb,fix:rFix,variabel:rVar,laden:rLaden,splitwise:rSw,konto:rKonto})[tab](m)}
+  ({uebersicht:rUeb,rueckblick:rRb,fix:rFix,mutti:rMutti,variabel:rVar,laden:rLaden,splitwise:rSw,konto:rKonto})[tab](m)}
 
 function mkChart(id,conf){charts[id]?.destroy();charts[id]=new Chart(document.getElementById(id),conf);return charts[id]}
 function baseOpts(extra={}){const t2=css("--text-2"),ln=css("--line");return Object.assign({responsive:true,maintainAspectRatio:false,
@@ -407,7 +419,6 @@ function rFix(m){
       <td class="n">${eur(per.andre,2)}</td><td class="n">${eur(per.claudi,2)}</td><td class="n">${per.mutti?eur(per.mutti,2):""}</td><td class="n">${eur(per.gesamt,2)}</td><td class="n">${eur(bisher(p,m))}</td>
       <td class="n act">${beendet?"":`<button class="btn-s" onclick="openEdit('${p.id}')" aria-label="${p.posten} ändern">✎</button>`}</td></tr>`});
   $("#tFix").innerHTML=h+"</tbody>";labelTable($("#tFix"));
-  rMutti(m);
   const log=(D.fixkosten?.aenderungen||[]).slice(-30);
   $("#logFix").innerHTML=log.slice().reverse().map(x=>`<li><strong>${new Date(x.zeit).toLocaleDateString("de-DE")}</strong> · ${x.beschreibung}${x.von?` <span class="sub2">von ${x.von}</span>`:""}</li>`).join("")||"<li>Noch keine Änderungen.</li>";
 }
@@ -538,28 +549,61 @@ async function saveEdit(){
   catch(e){err(e.message)}finally{$("#edSave").disabled=false}}
 
 
-/* ---------- Schulden bei Mutti ---------- */
+/* ---------- Darlehen Mutti ---------- */
 const SM=()=>D.fixkosten?.schulden_mutti||{};
-function tilgung(m){const r=SM().rate_posten,ids=Array.isArray(r)?r:[r];return fixAktiv(m).reduce((s,{p,per})=>s+(per.mutti||0)+(ids.includes(p.id)?per.gesamt:0),0)}
+function verrechnung(m){return fixAktiv(m).reduce((s,{per})=>s+(per.mutti||0),0)}
+function muttiStand(m){ // Stand am Ende von Monat m
+  const sm=SM();if(sm.start_betrag==null)return null;const ab=ym(sm.verrechnung_ab||sm.stand_datum);
+  const ms=m>=ab?monthsBetween(ab,m):[];const verr=ms.reduce((s,k)=>s+verrechnung(k),0);
+  const zur=(sm.zurueckgezahlt_bis_stand||0)+verr;return {verr,zur,rest:sm.start_betrag-zur}}
+function etfAm(datum){const e=SM().etf||{};const ein=(e.eingezahlt||[]).filter(x=>x.datum<=datum).at(-1),w=(e.wert||[]).filter(x=>x.datum<=datum).at(-1);return {ein,w}}
+function etfRate(m){const id=SM().etf?.posten;const x=fixAktiv(m).find(a=>a.p.id===id);return x?x.per.gesamt:0}
 function rMutti(m){
-  const sm=SM(),t=tilgung(m),st=sm.start_datum?ym(sm.start_datum):fixStart();
-  const nutz=fixAktiv(m).filter(x=>x.per.mutti>0);
-  const bis=st&&st<=m?monthsBetween(st,m):[];const getilgt=bis.reduce((s,k)=>s+tilgung(k),0);
-  let h=kpi("Tilgung pro Monat",eur(t,2),`Raten ${eur(t-nutz.reduce((s,x)=>s+x.per.mutti,0),2)} + Mitnutzung ${eur(nutz.reduce((s,x)=>s+x.per.mutti,0),2)}`)+
-    kpi("Getilgt",eur(getilgt,2),st?`seit ${monthName(st)}`:"");
-  if(sm.start_betrag!=null){const rest=Math.max(0,sm.start_betrag-getilgt);const n=t>0?Math.ceil(rest/t):null;
-    let frei="";if(n!=null){let [y,mo]=m.split("-").map(Number);mo+=n;while(mo>12){mo-=12;y++}frei=monthName(`${y}-${String(mo).padStart(2,"0")}`)}
-    h+=kpi("Restschuld",eur(rest,2),`von ${eur(sm.start_betrag,2)} am ${new Date(sm.start_datum).toLocaleDateString("de-DE")}`)+kpi("Schuldenfrei",rest<=0?"geschafft":frei||"–",rest>0&&n?`noch ${n} Monate bei gleicher Tilgung`:"")}
-  $("#kpisMutti").innerHTML=h;
-  $("#muttiInfo").textContent=(nutz.length?"Mitgenutzt: "+nutz.map(x=>`${x.p.posten} ${eur(x.per.mutti,2)}`).join(" · ")+". ":"")+
-    (sm.start_betrag==null?"Trag über „Startsaldo ✎“ ein, wie viel ihr Mutti an welchem Tag geschuldet habt – dann rechnet die App Restschuld und Enddatum.":"")}
-function openMutti(){const sm=SM();const d=prompt("Stichtag des Schuldenstands (TT.MM.JJJJ):",sm.start_datum?new Date(sm.start_datum).toLocaleDateString("de-DE"):"01.09.2026");if(!d)return;
-  const mt=d.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(!mt)return alert("Bitte als TT.MM.JJJJ eingeben.");
-  const b=numIn(prompt("Schulden bei Mutti an diesem Tag (€):",sm.start_betrag??""));if(b==null||isNaN(b))return alert("Bitte einen Betrag eingeben.");
-  const iso=`${mt[3]}-${mt[2].padStart(2,"0")}-${mt[1].padStart(2,"0")}`;
-  commitFix(data=>{data.schulden_mutti=Object.assign(data.schulden_mutti||{},{start_datum:iso,start_betrag:b});
-    const t=`Schulden bei Mutti: Stand ${eur(b,2)} am ${d.trim()}`;data.aenderungen=data.aenderungen||[];data.aenderungen.push({zeit:new Date().toISOString().slice(0,16),art:"mutti",von:"Andre",beschreibung:t});return t})
-   .then(render).catch(e=>alert(e.message))}
+  const sm=SM();if(sm.start_betrag==null){$("#kpisMutti").innerHTML=kpi("Darlehen Mutti","–","Grunddaten fehlen – über „Grunddaten ✎“ eintragen.");return}
+  const heute=new Date().toISOString().slice(0,7),bis=m>=heute?addM(heute,-1):m; // abgeschlossene Monate
+  const st=muttiStand(bis),rate=verrechnung(m),e=etfAm(bis===m?mEnd(m):new Date().toISOString().slice(0,10)),etfW=e.w?.wert??e.ein?.summe??0,etfE=e.ein?.summe??0;
+  const offen=st.rest-etfW,n=rate>0?Math.ceil(st.rest/rate):null,n2=(rate+etfRate(m))>0?Math.ceil(Math.max(0,offen)/(rate+etfRate(m))):null;
+  const fm=k=>k?monthName(k):"–";
+  $("#hintMutti").textContent=`Zinsloses Darlehen ${eur(sm.start_betrag)} · Stand ${new Date(sm.stand_datum).toLocaleDateString("de-DE")}: ${eur(sm.zurueckgezahlt_bis_stand)} zurückgezahlt · seitdem wird Muttis Anteil an Handy, TV und Netflix angerechnet · Zahlen bis Ende ${monthName(bis)}`;
+  $("#kpisMutti").innerHTML=kpi("Restschuld",eur(st.rest,2),`von ${eur(sm.start_betrag)} · ${num(st.zur/sm.start_betrag*100,1)} % getilgt`)+
+    kpi("Zurückgezahlt",eur(st.zur,2),`davon seit ${monthName(ym(sm.verrechnung_ab||sm.stand_datum))} verrechnet ${eur(st.verr,2)}`)+
+    kpi("Monatliche Verrechnung",eur(rate,2),n?`so erledigt in ${n} Monaten (${fm(addM(bis,n))})`:"")+
+    kpi("ETF für Mutti",eur(etfW,2),e.w?`eingezahlt ${eur(etfE)} · ${etfW-etfE>=0?"+":"−"}${eur(Math.abs(etfW-etfE),2)} (${new Date(e.w.datum).toLocaleDateString("de-DE")})`:`eingezahlt ${eur(etfE)}`,etfW>=etfE?"pos":"neg")+
+    kpi("Offen nach ETF",eur(Math.max(0,offen),2),n2!=null?`mit Verrechnung + ${eur(etfRate(m))} ETF/Monat: ${fm(addM(bis,n2))}`:"");
+  // Posten
+  const akt=fixAktiv(m).filter(x=>x.per.mutti>0);
+  $("#tMuttiPosten").innerHTML=`<thead><tr><th>Vertrag</th><th class="n">Muttis Anteil</th></tr></thead><tbody>`+akt.map(({p,per})=>`<tr><td>${p.posten}<span class="sub2">${p.anbieter||""}${per.bis?` · bis ${new Date(per.bis).toLocaleDateString("de-DE")}`:""}</span></td><td class="n">${eur(per.mutti,2)}</td></tr>`).join("")+
+    `<tr class="cat"><td>Summe pro Monat</td><td class="n">${eur(rate,2)}</td></tr></tbody>`;labelTable($("#tMuttiPosten"));
+  const et=SM().etf||{};$("#hintEtf").textContent=`Sparrate ${eur(etfRate(m))}/Monat · wird für Mutti gesammelt, nicht mit der Restschuld verrechnet`;
+  const pts=[...(et.eingezahlt||[]).map(x=>({d:x.datum,e:x.summe})),...(et.wert||[]).map(x=>({d:x.datum,w:x.wert}))].reduce((o,x)=>{(o[x.d]=o[x.d]||{d:x.d});Object.assign(o[x.d],x);return o},{});
+  $("#tEtf").innerHTML=`<thead><tr><th>Stand</th><th class="n">Eingezahlt</th><th class="n">Wert</th></tr></thead><tbody>`+Object.values(pts).sort((a,b)=>a.d<b.d?1:-1).map(x=>`<tr><td>${new Date(x.d).toLocaleDateString("de-DE")}</td><td class="n">${x.e!=null?eur(x.e,2):""}</td><td class="n">${x.w!=null?eur(x.w,2):""}</td></tr>`).join("")+"</tbody>";labelTable($("#tEtf"));
+  // Verlauf + Ausblick (24 Monate)
+  const ab=ym(sm.verrechnung_ab||sm.stand_datum),M=monthsBetween(ab,addM(bis,24));
+  const rest=M.map(k=>k<=bis?muttiStand(k).rest:null),fut=M.map((k,i)=>k>=bis?Math.max(0,muttiStand(bis).rest-monthsBetween(addM(bis,1),k).length*rate+(k===bis?0:0)):null);
+  const etfLine=M.map(k=>{const x=etfAm(mEnd(k));return k<=bis?(x.ein?.summe??null):null});
+  let lastE=etfE;const etfFut=M.map(k=>k>=bis?(k===bis?lastE:(lastE+=etfRate(k))):null);
+  mkChart("cMutti",{type:"line",data:{labels:M.map(monthShort),datasets:[
+    {label:"Restschuld",data:rest,borderColor:css("--s2"),backgroundColor:css("--s2"),pointRadius:2,spanGaps:true},
+    {label:"Restschuld (Ausblick)",data:fut,borderColor:css("--s2"),borderDash:[5,4],pointRadius:0},
+    {label:"ETF eingezahlt",data:etfLine,borderColor:css("--s3"),backgroundColor:css("--s3"),pointRadius:2,spanGaps:true},
+    {label:"ETF (Ausblick)",data:etfFut,borderColor:css("--s3"),borderDash:[5,4],pointRadius:0}]},
+    options:baseOpts({plugins:{legend:{display:true,labels:{color:css("--text-2"),boxWidth:10,filter:i=>!i.text.includes("Ausblick")}}},scales:{x:{grid:{display:false},ticks:{color:css("--text-2")}},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}}}})});
+  // Monat für Monat
+  const MM=monthsBetween(ab,bis).reverse();
+  $("#tMuttiMon").innerHTML=`<thead><tr><th>Monat</th><th class="n">Verrechnet</th><th class="n">Zurückgezahlt gesamt</th><th class="n">Restschuld</th><th class="n">ETF eingezahlt</th></tr></thead><tbody>`+
+    MM.map(k=>{const s=muttiStand(k),x=etfAm(mEnd(k));return `<tr><td>${monthName(k)}</td><td class="n">${eur(verrechnung(k),2)}</td><td class="n">${eur(s.zur,2)}</td><td class="n">${eur(s.rest,2)}</td><td class="n">${x.ein?eur(x.ein.summe):""}</td></tr>`}).join("")+
+    `<tr><td>Stand ${new Date(sm.stand_datum).toLocaleDateString("de-DE")}</td><td></td><td class="n">${eur(sm.zurueckgezahlt_bis_stand,2)}</td><td class="n">${eur(sm.start_betrag-sm.zurueckgezahlt_bis_stand,2)}</td><td></td></tr></tbody>`;labelTable($("#tMuttiMon"))}
+function openEtf(){const d=prompt("Datum des ETF-Stands (TT.MM.JJJJ):",new Date().toLocaleDateString("de-DE"));if(!d)return;const mt=d.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(!mt)return alert("Bitte als TT.MM.JJJJ.");
+  const iso=`${mt[3]}-${mt[2].padStart(2,"0")}-${mt[1].padStart(2,"0")}`;const ein=numIn(prompt("Bisher eingezahlt (€):",""));const w=numIn(prompt("Aktueller Wert laut Depot (€):",""));
+  if([ein,w].some(x=>x==null||isNaN(x)))return alert("Bitte beide Beträge eingeben.");
+  commitFix(data=>{const e=data.schulden_mutti.etf=data.schulden_mutti.etf||{eingezahlt:[],wert:[]};e.eingezahlt=(e.eingezahlt||[]).filter(x=>x.datum!==iso).concat({datum:iso,summe:ein}).sort((a,b)=>a.datum<b.datum?-1:1);
+    e.wert=(e.wert||[]).filter(x=>x.datum!==iso).concat({datum:iso,wert:w}).sort((a,b)=>a.datum<b.datum?-1:1);const t=`ETF für Mutti: ${eur(ein,2)} eingezahlt, Wert ${eur(w,2)} am ${d.trim()}`;
+    data.aenderungen.push({zeit:new Date().toISOString().slice(0,16),art:"mutti",von:"Andre",beschreibung:t});return t}).then(render).catch(e=>alert(e.message))}
+function openMuttiStart(){const sm=SM();const b=numIn(prompt("Ursprüngliche Schuld (€):",sm.start_betrag??""));if(b==null||isNaN(b))return;
+  const d=prompt("Stichtag, ab dem verrechnet wird (TT.MM.JJJJ):",sm.stand_datum?new Date(sm.stand_datum).toLocaleDateString("de-DE"):"01.01.2026");const mt=(d||"").trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(!mt)return alert("Bitte als TT.MM.JJJJ.");
+  const z=numIn(prompt("Bis zu diesem Tag schon zurückgezahlt (€):",sm.zurueckgezahlt_bis_stand??0));if(z==null||isNaN(z))return;const iso=`${mt[3]}-${mt[2].padStart(2,"0")}-${mt[1].padStart(2,"0")}`;
+  commitFix(data=>{Object.assign(data.schulden_mutti,{start_betrag:b,stand_datum:iso,verrechnung_ab:iso,zurueckgezahlt_bis_stand:z});const t=`Darlehen Mutti: ${eur(b)} Schuld, bis ${d.trim()} ${eur(z,2)} zurückgezahlt`;
+    data.aenderungen.push({zeit:new Date().toISOString().slice(0,16),art:"mutti",von:"Andre",beschreibung:t});return t}).then(render).catch(e=>alert(e.message))}
 
 /* ---------- Variable Kosten (Splitwise-Gruppen) ---------- */
 const varRows=()=>(D.splitwise_variabel?.eintraege||[]).filter(x=>x.typ!=="Ausgleich");
