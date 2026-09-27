@@ -124,6 +124,7 @@ dialog select,dialog input,dialog textarea{width:100%}
   </div>
   <nav role="tablist">
     <button role="tab" data-tab="uebersicht" aria-selected="true">Übersicht</button>
+    <button role="tab" data-tab="rueckblick" aria-selected="false">Rückblick</button>
     <button role="tab" data-tab="fix" aria-selected="false">Fixkosten</button>
     <button role="tab" data-tab="variabel" aria-selected="false">Variabel</button>
     <button role="tab" data-tab="laden" aria-selected="false">Auto &amp; Laden</button>
@@ -148,6 +149,17 @@ dialog select,dialog input,dialog textarea{width:100%}
         <div class="legend"><span><i style="background:var(--s1)"></i>Laden</span><span><i style="background:var(--s2)"></i>Sonstiges Auto</span></div>
         <div class="chart"><canvas id="cAuto"></canvas></div></div>
     </div>
+  </section>
+
+  <section id="tab-rueckblick" class="hidden">
+    <p class="hint" id="hintRb" style="margin:0 0 10px"></p>
+    <div class="kpis" id="kpisRb"></div>
+    <div class="card"><h2>Haushaltsausgaben – 13 Monate und Ausblick</h2><p class="hint" id="hintRbHaus"></p><div class="legend" id="legRb"></div><div class="chart" style="height:320px"><canvas id="cRbHaus"></canvas></div></div>
+    <div class="grid2 full">
+      <div class="card"><h2>Andres Konto</h2><p class="hint">Einnahmen, Ausgaben und was übrig blieb (nur Andre)</p><div class="chart"><canvas id="cRbKonto"></canvas></div></div>
+      <div class="card"><h2>Auto</h2><p class="hint">Ladekosten pro Monat und € pro 100 km (gleitend 12 Monate)</p><div class="chart"><canvas id="cRbAuto"></canvas></div></div>
+    </div>
+    <div class="card full"><h2>Monat für Monat</h2><p class="hint" id="hintRbTab"></p><div class="tablewrap"><table id="tRb" class="resp"></table></div></div>
   </section>
 
   <section id="tab-fix" class="hidden">
@@ -325,7 +337,7 @@ function init(){
 }
 function kpi(label,value,sub,cls=""){return `<div class="card kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`}
 function render(){const m=$("#month").value;if(!m)return;
-  ({uebersicht:rUeb,fix:rFix,variabel:rVar,laden:rLaden,splitwise:rSw,konto:rKonto})[tab](m)}
+  ({uebersicht:rUeb,rueckblick:rRb,fix:rFix,variabel:rVar,laden:rLaden,splitwise:rSw,konto:rKonto})[tab](m)}
 
 function mkChart(id,conf){charts[id]?.destroy();charts[id]=new Chart(document.getElementById(id),conf);return charts[id]}
 function baseOpts(extra={}){const t2=css("--text-2"),ln=css("--line");return Object.assign({responsive:true,maintainAspectRatio:false,
@@ -613,6 +625,57 @@ function rKonto(m){
   $("#tKonto").innerHTML=`<thead><tr><th>Buchung</th><th>Kategorie</th><th class="n">Betrag</th></tr></thead><tbody>`+
     (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")}${x.splitwise?` · in Splitwise (${x.splitwise.gruppe}), dein Anteil ${eur(x.splitwise.anteil_andre,2)}`:""}${x.zweck?" · "+x.zweck:""}</span></td><td>${x.kategorie}<span class="sub2">${x.bereich}</span></td><td class="n ${x.betrag>0?"pos":""}">${eur(x.betrag,2)}</td></tr>`).join(""):`<tr><td colspan="3">Keine Buchungen.</td></tr>`)+"</tbody>";
   labelTable($("#tKonto"))}
+
+
+/* ---------- Rückblick 13 Monate + Ausblick ---------- */
+function addM(m,n){let [y,mo]=m.split("-").map(Number);mo+=n;while(mo>12){mo-=12;y++}while(mo<1){mo+=12;y--}return `${y}-${String(mo).padStart(2,"0")}`}
+function fixRb(k){const st=fixStart();return st&&k<st?fixTotal(st):fixTotal(k)} // vor Erfassungsbeginn: Stand zum Beginn (Annahme)
+function hausMonat(k){const hasVar=D.splitwise_variabel&&!D.splitwise_variabel.error;
+  return {fix:fixRb(k),laden:ladenPerson(ladenMonat(k)),auto:swMonat(k,"Ausgabe"),alltag:hasVar?varMonat(k,"alltag"):0,hobby:hasVar?varMonat(k,"hobby"):0,anlass:hasVar?varMonat(k,"anlass"):0}}
+const RBS=[["fix","Fixkosten","--s1"],["laden","Laden","--s3"],["auto","Sonstiges Auto","--s6"],["alltag","Alltag","--s2"],["hobby","Hobby & Co","--s5"],["anlass","Urlaub & Anlässe","--s4"]];
+function rRb(m){
+  const M=Array.from({length:13},(_,i)=>addM(m,i-12)),F=[1,2,3].map(i=>addM(m,i));
+  const rows=M.map(k=>({k,...hausMonat(k)}));rows.forEach(r=>r.sum=RBS.reduce((s,[x])=>s+r[x],0));
+  const st=fixStart(),sum=rows.reduce((s,r)=>s+r.sum,0),avg=sum/13;
+  const last3=rows.slice(-3).reduce((s,r)=>s+r.sum,0)/3,prev3=rows.slice(-6,-3).reduce((s,r)=>s+r.sum,0)/3,tr=prev3?(last3/prev3-1)*100:0;
+  const vj=rows[0],jetzt=rows[12];
+  const who=person==="alle"?"Andre + Claudia":person==="andre"?"Andres Anteil":"Claudias Anteil";
+  $("#hintRb").textContent=`${monthName(M[0])} bis ${monthName(m)} · ${who}`+(st&&M[0]<st?` · Fixkosten vor ${monthName(st)} mit dem Stand von ${monthName(st)} angenommen (erfasst erst seitdem)`:"");
+  $("#kpisRb").innerHTML=kpi("Ausgaben in 13 Monaten",eur(sum),`Ø ${eur(avg)} pro Monat`)+
+    kpi("Trend",(tr>=0?"+":"−")+num(Math.abs(tr),0)+" %","letzte 3 Monate gegen die 3 davor",tr>3?"neg":tr<-3?"pos":"")+
+    kpi("Gegenüber Vorjahresmonat",(jetzt.sum-vj.sum>=0?"+":"−")+eur(Math.abs(jetzt.sum-vj.sum)),`${monthName(m)} vs. ${monthName(M[0])}`,jetzt.sum>vj.sum?"neg":"pos")+
+    kpi("Teuerster Monat",monthName(rows.reduce((a,b)=>b.sum>a.sum?b:a).k),eur(Math.max(...rows.map(r=>r.sum))));
+  // Ausblick: Fixkosten exakt aus Perioden (inkl. geplanter Änderungen), Rest = Ø der letzten 6 Monate
+  const avg6=x=>rows.slice(-6).reduce((s,r)=>s+r[x],0)/6;
+  const fut=F.map(k=>({k,fix:fixTotal(k),laden:avg6("laden"),auto:avg6("auto"),alltag:avg6("alltag"),hobby:avg6("hobby"),anlass:avg6("anlass")}));
+  $("#hintRbHaus").textContent=`Blasse Balken = Ausblick: Fixkosten inkl. bereits eingetragener Änderungen, alles andere als Ø der letzten 6 Monate · Linie = gleitender 3-Monats-Schnitt`;
+  $("#legRb").innerHTML=RBS.map(([x,n,c])=>`<span><i style="background:var(${c})"></i>${n}</span>`).join("");
+  const all=[...rows,...fut],lab=all.map(r=>monthShort(r.k)+(F.includes(r.k)?" *":""));
+  const ma=all.map((r,i)=>i<2||i>12?null:all.slice(i-2,i+1).reduce((s,x)=>s+RBS.reduce((t,[y])=>t+x[y],0),0)/3);
+  mkChart("cRbHaus",{type:"bar",data:{labels:lab,datasets:[...RBS.map(([x,n,c],i)=>({label:n,data:all.map(r=>r[x]),stack:"a",
+      backgroundColor:all.map(r=>F.includes(r.k)?css(c)+"55":css(c)),borderColor:css("--surface"),borderWidth:{top:1}})),
+      {type:"line",label:"Ø 3 Monate",data:ma,borderColor:css("--text"),borderWidth:2,pointRadius:0,tension:.3,stack:"l"}]},
+    options:baseOpts({scales:{x:{grid:{display:false},ticks:{color:css("--text-2")},stacked:true},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)},stacked:true}}})});
+  // Andres Konto
+  const kms=new Set(kRows().map(x=>ym(x.datum)));
+  const kEin=M.map(k=>kms.has(k)?kSum(k,"Einnahme"):null),kAus=M.map(k=>kms.has(k)?-(kSum(k,"Fixkosten")+kSum(k,"Laden")+kSum(k,"Ausgabe")+kSum(k,"Splitwise")+kSum(k,"Ausgleich")):null);
+  let cum=0;const kCum=M.map((k,i)=>kEin[i]==null?null:(cum+=kEin[i]-kAus[i]));
+  mkChart("cRbKonto",{type:"bar",data:{labels:M.map(monthShort),datasets:[{label:"Einnahmen",data:kEin,backgroundColor:css("--good"),borderRadius:3},{label:"Ausgaben",data:kAus,backgroundColor:css("--s2"),borderRadius:3},
+      {type:"line",label:"Überschuss kumuliert",data:kCum,borderColor:css("--s1"),pointRadius:2,tension:.2,spanGaps:true}]},options:baseOpts({plugins:{legend:{display:true,labels:{color:css("--text-2"),boxWidth:10}}},scales:{x:{grid:{display:false},ticks:{color:css("--text-2")}},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}}}})});
+  // Auto
+  const e100=M.map(k=>{const r=kmPer100(k);return r&&r.r12?r.r12:null});
+  mkChart("cRbAuto",{type:"bar",data:{labels:M.map(monthShort),datasets:[{label:"Ladekosten",data:M.map(k=>ladenMonat(k)),backgroundColor:css("--s3"),borderRadius:3,yAxisID:"y"},
+      {type:"line",label:"€/100 km (12 Mon.)",data:e100,borderColor:css("--s7"),pointRadius:2,spanGaps:true,yAxisID:"y1",tooltip:{callbacks:{label:c=>` ${num(c.parsed.y,2)} €/100 km`}}}]},
+    options:baseOpts({plugins:{legend:{display:true,labels:{color:css("--text-2"),boxWidth:10}}},scales:{x:{grid:{display:false},ticks:{color:css("--text-2")}},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}},
+      y1:{position:"right",grid:{display:false},border:{display:false},ticks:{color:css("--text-2"),callback:v=>num(v,1)+" €"}}}})});
+  // Tabelle
+  const kUe=M.map((k,i)=>kEin[i]==null?null:kEin[i]-kAus[i]);
+  $("#hintRbTab").textContent="Haushalt je nach Sicht oben · Andre-Spalten aus dem Girokonto (leer = kein Kontoauszug)";
+  let h=`<thead><tr><th>Monat</th><th class="n">Fix</th><th class="n">Laden & Auto</th><th class="n">Variabel</th><th class="n">Summe</th><th class="n">Andre rein</th><th class="n">Andre übrig</th></tr></thead><tbody>`;
+  rows.slice().reverse().forEach((r,j)=>{const i=12-j;h+=`<tr><td>${monthName(r.k)}</td><td class="n">${eur(r.fix)}</td><td class="n">${eur(r.laden+r.auto)}</td><td class="n">${eur(r.alltag+r.hobby+r.anlass)}</td><td class="n"><strong>${eur(r.sum)}</strong></td><td class="n">${kEin[i]==null?"":eur(kEin[i])}</td><td class="n ${kUe[i]==null?"":kUe[i]>=0?"pos":"neg"}">${kUe[i]==null?"":eur(kUe[i])}</td></tr>`});
+  const av=x=>rows.reduce((s,r)=>s+x(r),0)/13;
+  h+=`<tr class="cat"><td>Ø pro Monat</td><td class="n">${eur(av(r=>r.fix))}</td><td class="n">${eur(av(r=>r.laden+r.auto))}</td><td class="n">${eur(av(r=>r.alltag+r.hobby+r.anlass))}</td><td class="n">${eur(avg)}</td><td></td><td></td></tr>`;
+  $("#tRb").innerHTML=h+"</tbody>";labelTable($("#tRb"))}
 
 /* ---------- Bedienung ---------- */
 $("#qKonto").oninput=()=>tab==="konto"&&rKonto($("#month").value);
