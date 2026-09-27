@@ -128,6 +128,7 @@ dialog select,dialog input,dialog textarea{width:100%}
     <button role="tab" data-tab="variabel" aria-selected="false">Variabel</button>
     <button role="tab" data-tab="laden" aria-selected="false">Auto &amp; Laden</button>
     <button role="tab" data-tab="splitwise" aria-selected="false">Splitwise</button>
+    <button role="tab" data-tab="konto" aria-selected="false">Andres Konto</button>
   </nav>
 </header>
 
@@ -184,6 +185,18 @@ dialog select,dialog input,dialog textarea{width:100%}
     <div class="card" style="margin-top:12px"><h2>Ladevorgänge im Monat</h2><div class="tablewrap"><table id="tLaden" class="resp"></table></div></div>
   </section>
 
+  <section id="tab-konto" class="hidden">
+    <p class="hint" id="hintKonto" style="margin:0 0 10px"></p>
+    <div class="kpis" id="kpisKonto"></div>
+    <div class="grid2">
+      <div class="card"><h2>Rein und raus – letzte 12 Monate</h2><p class="hint">Einnahmen gegen Ausgaben vom Girokonto, ohne Umbuchungen auf eigene Konten</p><div class="legend" id="legKonto"></div><div class="chart"><canvas id="cKonto"></canvas></div></div>
+      <div class="card"><h2>Eigene Ausgaben nach Kategorie</h2><p class="hint" id="hintKontoKat"></p><div class="chart"><canvas id="cKontoKat"></canvas></div></div>
+    </div>
+    <div class="card full"><div class="toolbar"><h2>Buchungen im Monat</h2><div class="seg" id="kontoBereich" role="group" aria-label="Bereich"></div></div>
+      <input type="search" id="qKonto" placeholder="Suchen (Empfänger, Kategorie)" style="width:100%;margin-bottom:8px">
+      <div class="tablewrap"><table id="tKonto" class="resp"></table></div></div>
+  </section>
+
   <section id="tab-splitwise" class="hidden">
     <div class="kpis" id="kpisSw"></div>
     <div class="card"><h2>Einträge im Monat</h2><p class="hint" id="hintSw"></p><div class="tablewrap"><table id="tSw" class="resp"></table></div></div>
@@ -230,7 +243,7 @@ dialog select,dialog input,dialog textarea{width:100%}
 </dialog>
 
 <script>
-const FILES=["fixkosten","splitwise","laden","km","splitwise_variabel"];const OPTIONAL=["km","splitwise_variabel"];
+const FILES=["fixkosten","splitwise","laden","km","splitwise_variabel","konto_andre"];const OPTIONAL=["km","splitwise_variabel","konto_andre"];
 const PROV=["IONITY","L-Strom.drive","E.ON Drive","BMW Charging","Sonstige"];
 const $=s=>document.querySelector(s);
 const eur=(v,d=0)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:d,maximumFractionDigits:d});
@@ -297,7 +310,7 @@ function ladenQuote(){const r=swRows().filter(x=>x.typ==="Laden").slice(-60);con
 function ladenMonat(m){return ladenRows().filter(x=>ym(x.datum)===m).reduce((s,x)=>s+(x.betrag||0),0)}
 function ladenPerson(v){const q=ladenQuote();return person==="andre"?v*q:person==="claudia"?v*(1-q):v}
 function swMonat(m,typ){return swRows().filter(x=>ym(x.datum)===m&&x.typ===typ).reduce((s,x)=>s+share(x.anteil_andre,x.anteil_claudia),0)}
-function months(){const s=new Set([...swRows().map(x=>ym(x.datum)),...ladenRows().map(x=>ym(x.datum))]);
+function months(){const s=new Set([...swRows().map(x=>ym(x.datum)),...ladenRows().map(x=>ym(x.datum)),...kRows().map(x=>ym(x.datum))]);
   const now=new Date();s.add(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`);return [...s].sort()}
 function last12(m){const out=[];let [y,mo]=m.split("-").map(Number);for(let i=11;i>=0;i--){let yy=y,mm=mo-i;while(mm<1){mm+=12;yy--}out.push(`${yy}-${String(mm).padStart(2,"0")}`)}return out}
 
@@ -312,7 +325,7 @@ function init(){
 }
 function kpi(label,value,sub,cls=""){return `<div class="card kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`}
 function render(){const m=$("#month").value;if(!m)return;
-  ({uebersicht:rUeb,fix:rFix,variabel:rVar,laden:rLaden,splitwise:rSw})[tab](m)}
+  ({uebersicht:rUeb,fix:rFix,variabel:rVar,laden:rLaden,splitwise:rSw,konto:rKonto})[tab](m)}
 
 function mkChart(id,conf){charts[id]?.destroy();charts[id]=new Chart(document.getElementById(id),conf);return charts[id]}
 function baseOpts(extra={}){const t2=css("--text-2"),ln=css("--line");return Object.assign({responsive:true,maintainAspectRatio:false,
@@ -564,7 +577,45 @@ function rVar(m){
     (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.beschreibung}<span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · ${x.gruppe}${x.mit_claudia===false?" (mit Freunden)":""}${x.kategorie?" · "+x.kategorie:""} · Beleg ${eur(x.kosten,2)}, bezahlt von ${x.bezahlt_von}</span></td><td class="n">${eur(x.anteil_andre+x.anteil_claudia,2)}</td><td class="n">${eur(x.anteil_andre,2)}</td><td class="n">${eur(x.anteil_claudia,2)}</td></tr>`).join(""):`<tr><td colspan="4">Keine Einträge.</td></tr>`)+"</tbody>";
   labelTable($("#tVar"))}
 
+
+/* ---------- Andres Girokonto (Kontoauszüge) ---------- */
+const kRows=()=>D.konto_andre?.buchungen||[];
+const KB=[["Einnahme","Einnahmen","--good"],["Fixkosten","Fixkosten","--s1"],["Laden","Laden","--s3"],["Ausgabe","Eigene Ausgaben","--s2"],["Splitwise","über Splitwise geteilt","--s4"],["Ausgleich","Ausgleich/Mutti","--s5"],["Sparen/Umbuchung","Sparen & Umbuchung","--s7"]];
+const kBer=x=>x.bereich==="Ausgabe"&&x.splitwise?"Splitwise":x.bereich;
+let kFilter="alle";
+function kSum(m,b){return kRows().filter(x=>ym(x.datum)===m&&kBer(x)===b).reduce((s,x)=>s+x.betrag,0)}
+function rKonto(m){
+  if(!kRows().length){$("#kpisKonto").innerHTML=kpi("Andres Konto","–","Noch keine Kontoauszüge eingelesen.");return}
+  const ms=[...new Set(kRows().map(x=>ym(x.datum)))].sort(),bis=ms.at(-1);
+  $("#hintKonto").textContent=`Nur Andre · ING-Girokonto · eingelesen bis ${monthName(bis)} · Ausgaben, die schon in Splitwise stehen, zählen dort (nur dein Anteil) und hier separat`;
+  if(!ms.includes(m)){$("#kpisKonto").innerHTML=kpi(monthName(m),"–",`Für diesen Monat liegt noch kein Kontoauszug vor (bis ${monthName(bis)}).`);["cKonto","cKontoKat"].forEach(i=>charts[i]?.destroy());$("#tKonto").innerHTML="";return}
+  const ein=kSum(m,"Einnahme"),fix=-kSum(m,"Fixkosten"),lad=-kSum(m,"Laden"),aus=-kSum(m,"Ausgabe"),sw=-kSum(m,"Splitwise"),aus2=-kSum(m,"Ausgleich");
+  const rest=ein-fix-lad-aus-sw-aus2;
+  const gehalt=kRows().filter(x=>ym(x.datum)===m&&x.kategorie==="Gehalt").reduce((s,x)=>s+x.betrag,0);
+  $("#kpisKonto").innerHTML=kpi("Einnahmen",eur(ein),gehalt?`davon Gehalt ${eur(gehalt)}`:"")+kpi("Fixkosten & Kredite",eur(fix),"Lastschriften & Daueraufträge")+
+    kpi("Eigene Ausgaben",eur(aus),"nur du, nicht in Splitwise")+kpi("In Splitwise geteilt",eur(sw),"von dir vorgestreckt")+kpi("Laden",eur(lad),"Ladekarten")+
+    kpi("Überschuss",eur(rest),"Einnahmen − alle Ausgaben",rest>=0?"pos":"neg");
+  const L=last12(m);const cols=KB.filter(b=>!["Einnahme","Sparen/Umbuchung"].includes(b[0]));
+  $("#legKonto").innerHTML=[["Einnahme","Einnahmen","--good"],...cols].map(b=>`<span><i style="background:var(${b[2]})"></i>${b[1]}</span>`).join("");
+  mkChart("cKonto",{type:"bar",data:{labels:L.map(monthShort),datasets:[{label:"Einnahmen",data:L.map(k=>ms.includes(k)?kSum(k,"Einnahme"):null),backgroundColor:css("--good"),stack:"ein",borderRadius:4},
+    ...cols.map((b,i)=>({label:b[1],data:L.map(k=>ms.includes(k)?-kSum(k,b[0]):null),backgroundColor:css(b[2]),stack:"aus",borderColor:css("--surface"),borderWidth:{top:2}}))]},
+    options:baseOpts({scales:{x:{grid:{display:false},ticks:{color:css("--text-2")},stacked:true},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)},stacked:true}}})});
+  const kat={};kRows().filter(x=>ym(x.datum)===m&&x.bereich==="Ausgabe"&&!x.splitwise).forEach(x=>{const k=x.kategorie.replace(" (Erstattung)","");kat[k]=(kat[k]||0)-x.betrag});
+  const ent=Object.entries(kat).filter(([,v])=>v>0.5).sort((a,b)=>b[1]-a[1]);
+  $("#hintKontoKat").textContent=`${monthName(m)} · ohne Splitwise-Ausgaben, Erstattungen verrechnet`;
+  $("#cKontoKat").parentElement.style.height=Math.max(220,ent.length*30+50)+"px";
+  mkChart("cKontoKat",{type:"bar",data:{labels:ent.map(e=>e[0]),datasets:[{label:"Betrag",data:ent.map(e=>e[1]),backgroundColor:css("--s2"),borderRadius:4,barThickness:16}]},
+    options:baseOpts({indexAxis:"y",scales:{x:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}},y:{grid:{display:false},ticks:{color:css("--text"),autoSkip:false}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>" "+eur(c.parsed.x,2)}}}})});
+  $("#kontoBereich").innerHTML=[["alle","Alle"],["Ausgabe","Eigene"],["Splitwise","Splitwise"],["Fixkosten","Fix"],["Einnahme","Einnahmen"]].map(([k,n])=>`<button data-b="${k}" aria-pressed="${kFilter===k}">${n}</button>`).join("");
+  $("#kontoBereich").querySelectorAll("button").forEach(b=>b.onclick=()=>{kFilter=b.dataset.b;rKonto(m)});
+  const q=($("#qKonto").value||"").trim().toLowerCase();
+  const rows=kRows().filter(x=>ym(x.datum)===m&&(kFilter==="alle"||kBer(x)===kFilter)&&(!q||[x.empfaenger,x.kategorie,x.bereich].join(" ").toLowerCase().includes(q)));
+  $("#tKonto").innerHTML=`<thead><tr><th>Buchung</th><th>Kategorie</th><th class="n">Betrag</th></tr></thead><tbody>`+
+    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")}${x.splitwise?` · in Splitwise (${x.splitwise.gruppe}), dein Anteil ${eur(x.splitwise.anteil_andre,2)}`:""}${x.zweck?" · "+x.zweck:""}</span></td><td>${x.kategorie}<span class="sub2">${x.bereich}</span></td><td class="n ${x.betrag>0?"pos":""}">${eur(x.betrag,2)}</td></tr>`).join(""):`<tr><td colspan="3">Keine Buchungen.</td></tr>`)+"</tbody>";
+  labelTable($("#tKonto"))}
+
 /* ---------- Bedienung ---------- */
+$("#qKonto").oninput=()=>tab==="konto"&&rKonto($("#month").value);
 $("#qFix").oninput=()=>tab==="fix"&&rFix($("#month").value);
 $("#qVar").oninput=()=>tab==="variabel"&&rVar($("#month").value);
 $("#month").onchange=render;
