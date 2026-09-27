@@ -40,8 +40,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:2px}
 .seg button{border:0;background:transparent;border-radius:7px;padding:5px 11px;color:var(--text-2)}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.12)}
-nav{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;overflow-x:auto}
-nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:10px 12px;color:var(--text-2);white-space:nowrap}
+nav{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;flex-wrap:wrap;gap:0 4px}
+nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:9px 10px;color:var(--text-2);white-space:nowrap}
 nav button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
 main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
@@ -106,7 +106,7 @@ dialog select,dialog input,dialog textarea{width:100%}
   table.resp td.act{justify-content:flex-end}
   .form{grid-template-columns:1fr}
 }
-@media (max-width:560px){.kpi .value{font-size:23px}.chart{height:240px}h1{width:100%}}
+@media (max-width:560px){nav button{padding:8px 8px;font-size:14px}.kpi .value{font-size:23px}.chart{height:240px}h1{width:100%}}
 </style>
 </head>
 <body>
@@ -600,7 +600,8 @@ function rKonto(m){
   if(!kRows().length){$("#kpisKonto").innerHTML=kpi("Andres Konto","–","Noch keine Kontoauszüge eingelesen.");return}
   const ms=[...new Set(kRows().map(x=>ym(x.datum)))].sort(),bis=ms.at(-1);
   $("#hintKonto").textContent=`Nur Andre · ING-Girokonto · eingelesen bis ${monthName(bis)} · Ausgaben, die schon in Splitwise stehen, zählen dort (nur dein Anteil) und hier separat`;
-  if(!ms.includes(m)){$("#kpisKonto").innerHTML=kpi(monthName(m),"–",`Für diesen Monat liegt noch kein Kontoauszug vor (bis ${monthName(bis)}).`);["cKonto","cKontoKat"].forEach(i=>charts[i]?.destroy());$("#tKonto").innerHTML="";return}
+  if(!ms.includes(m)){const ask=m;m=ms.filter(k=>k<=ask).at(-1)||bis;
+    $("#hintKonto").textContent=`Für ${monthName(ask)} liegt noch kein Kontoauszug vor – angezeigt wird ${monthName(m)}, der letzte eingelesene Monat. Nur Andre · ING-Girokonto`}
   const ein=kSum(m,"Einnahme"),fix=-kSum(m,"Fixkosten"),lad=-kSum(m,"Laden"),aus=-kSum(m,"Ausgabe"),sw=-kSum(m,"Splitwise"),aus2=-kSum(m,"Ausgleich");
   const rest=ein-fix-lad-aus-sw-aus2;
   const gehalt=kRows().filter(x=>ym(x.datum)===m&&x.kategorie==="Gehalt").reduce((s,x)=>s+x.betrag,0);
