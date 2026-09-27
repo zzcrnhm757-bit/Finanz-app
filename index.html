@@ -71,6 +71,41 @@ dialog input{width:100%}
 .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 .note{font-size:12.5px;color:var(--text-3);margin-top:10px}
 .hidden{display:none!important}
+.tablewrap{overflow-x:hidden}
+table{table-layout:auto}
+td{overflow-wrap:anywhere}
+.full{margin-top:12px}
+.btn-s{padding:3px 9px;font-size:12.5px;border-radius:7px}
+.toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}
+.toolbar h2{margin:0}
+tr.ended td{color:var(--text-3)}
+.sub2{display:block;color:var(--text-3);font-size:12px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.form .w2{grid-column:1/-1}
+.form label{margin-top:10px}
+dialog select,dialog input,dialog textarea{width:100%}
+.arten{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.arten label{display:flex;gap:8px;align-items:flex-start;margin:0;padding:8px 10px;border:1px solid var(--line);border-radius:9px;color:var(--text);cursor:pointer}
+.arten input{width:auto;margin-top:3px}
+.arten small{display:block;color:var(--text-3)}
+.log li{margin:0 0 8px;font-size:13px}.log{padding-left:18px;margin:0}
+/* Tabellen auf schmalen Bildschirmen als Karten – kein seitliches Scrollen */
+@media (max-width:700px){
+  table.resp thead{display:none}
+  table.resp,table.resp tbody,table.resp tr,table.resp td{display:block;width:100%}
+  table.resp tr{padding:8px 0;border-bottom:1px solid var(--line)}
+  table.resp td{border:0;padding:2px 0;display:flex;justify-content:space-between;gap:12px;text-align:right}
+  table.resp td::before{content:attr(data-label);color:var(--text-3);font-size:12.5px;text-align:left;flex:none}
+  table.resp td:first-child{font-weight:600;text-align:left;display:block}
+  table.resp td:first-child .sub2{font-weight:400}
+  .tablewrap{max-height:none}
+  table.resp td:first-child::before{content:none}
+  table.resp td:empty{display:none}
+  table.resp tr.cat{padding:6px 0 2px;border:0}
+  table.resp tr.cat td{background:none;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2)}
+  table.resp td.act{justify-content:flex-end}
+  .form{grid-template-columns:1fr}
+}
 @media (max-width:560px){.kpi .value{font-size:23px}.chart{height:240px}h1{width:100%}}
 </style>
 </head>
@@ -114,31 +149,36 @@ dialog input{width:100%}
   </section>
 
   <section id="tab-fix" class="hidden">
+    <div class="kpis" id="kpisFix"></div>
     <div class="grid2">
+      <div class="card"><h2>Entwicklung der Fixkosten</h2><p class="hint" id="hintFixVerlauf"></p><div class="chart"><canvas id="cFixVerlauf"></canvas></div></div>
       <div class="card"><h2>Fixkosten nach Kategorie</h2><p class="hint" id="hintFix"></p><div class="chart" style="height:340px"><canvas id="cFix"></canvas></div></div>
-      <div class="card"><h2>Alle Posten</h2><p class="hint">Monatliche Beträge; Jahreszahlungen anteilig</p><div class="tablewrap"><table id="tFix"></table></div></div>
     </div>
+    <div class="card full"><div class="toolbar"><h2>Alle Posten</h2><button class="primary btn-s" onclick="openEdit(null)">+ Neuer Posten</button></div>
+      <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
+      <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
+    <div class="card full"><h2>Änderungsprotokoll</h2><p class="hint">Neueste zuerst</p><ol class="log" id="logFix" reversed></ol></div>
   </section>
 
   <section id="tab-laden" class="hidden">
     <div class="kpis" id="kpisLaden"></div>
     <div class="grid2">
       <div class="card"><h2>Ladekosten pro Monat</h2><p class="hint">Nach Anbieter, laut Rechnungen</p><div class="legend" id="legLaden"></div><div class="chart"><canvas id="cLaden"></canvas></div></div>
-      <div class="card"><h2>Preis pro kWh</h2><p class="hint">Durchschnitt je Anbieter, letzte 12 Monate</p><div class="tablewrap"><table id="tAnb"></table></div></div>
+      <div class="card"><h2>Preis pro kWh</h2><p class="hint">Durchschnitt je Anbieter, letzte 12 Monate</p><div class="tablewrap"><table id="tAnb" class="resp"></table></div></div>
     </div>
-    <div class="card" style="margin-top:12px"><h2>Ladevorgänge im Monat</h2><div class="tablewrap"><table id="tLaden"></table></div></div>
+    <div class="card" style="margin-top:12px"><h2>Ladevorgänge im Monat</h2><div class="tablewrap"><table id="tLaden" class="resp"></table></div></div>
   </section>
 
   <section id="tab-splitwise" class="hidden">
     <div class="kpis" id="kpisSw"></div>
-    <div class="card"><h2>Einträge im Monat</h2><p class="hint" id="hintSw"></p><div class="tablewrap"><table id="tSw"></table></div></div>
+    <div class="card"><h2>Einträge im Monat</h2><p class="hint" id="hintSw"></p><div class="tablewrap"><table id="tSw" class="resp"></table></div></div>
   </section>
   <p class="note" id="stand"></p>
 </main>
 
 <dialog id="dlg">
   <h2 style="margin:0 0 4px;font-size:17px">Datenquelle</h2>
-  <p class="note" style="margin-top:0">Privates GitHub-Repository mit dem Ordner <code>data/</code>. Der Zugangsschlüssel (Fine-grained token, nur „Contents: Read“ für dieses eine Repository) bleibt ausschließlich in diesem Browser gespeichert.</p>
+  <p class="note" style="margin-top:0">Privates GitHub-Repository mit dem Ordner <code>data/</code>. Der Zugangsschlüssel (Fine-grained token für dieses eine Repository: „Contents: Read-only“ zum Ansehen, „Read and write“ zum Ändern der Fixkosten) bleibt ausschließlich in diesem Browser gespeichert.</p>
   <label for="fOwner">GitHub-Benutzer</label><input id="fOwner" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="z. B. zzcrnhm757-bit" autocomplete="off">
   <label for="fRepo">Daten-Repository</label><input id="fRepo" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Finanzdaten" autocomplete="off">
   <label for="fToken">Zugangsschlüssel</label><input id="fToken" autocapitalize="off" autocorrect="off" spellcheck="false" type="password" placeholder="github_pat_…" autocomplete="off">
@@ -147,6 +187,30 @@ dialog input{width:100%}
     <button onclick="dlg.close()">Abbrechen</button>
     <button class="primary" onclick="saveSettings()">Speichern &amp; laden</button>
   </div>
+</dialog>
+
+<dialog id="dlgEdit">
+  <h2 style="margin:0 0 4px;font-size:17px" id="edTitle">Posten ändern</h2>
+  <p class="note" style="margin-top:0" id="edInfo"></p>
+  <div class="arten" id="edArten">
+    <label><input type="radio" name="art" value="korrektur" checked><span>Fehleintrag korrigieren<small>Betrag oder Angaben waren falsch – wird rückwirkend überschrieben, kein neuer Stand.</small></span></label>
+    <label><input type="radio" name="art" value="aenderung"><span>Änderung ab Datum<small>z. B. Preiserhöhung – bis zum Datum gilt der alte Betrag, danach der neue.</small></span></label>
+    <label><input type="radio" name="art" value="wegfall"><span>Kündigung / Wegfall<small>Posten endet – bis dahin angefallene Kosten bleiben im Verlauf.</small></span></label>
+  </div>
+  <div class="form">
+    <div class="w2 f-daten"><label for="eDatum" id="eDatumL">Gültig ab</label><input type="date" id="eDatum"></div>
+    <div class="w2 f-daten"><label for="ePosten">Posten</label><input id="ePosten"></div>
+    <div class="f-daten"><label for="eKat">Kategorie</label><input id="eKat" list="katList"></div>
+    <div class="f-daten"><label for="eAnb">Anbieter</label><input id="eAnb"></div>
+    <div class="f-betrag"><label for="eA">Andre € / Monat</label><input id="eA" inputmode="decimal"></div>
+    <div class="f-betrag"><label for="eC">Claudia € / Monat</label><input id="eC" inputmode="decimal"></div>
+    <div class="f-betrag"><label for="eG">Gesamt € / Monat</label><input id="eG" inputmode="decimal" placeholder="leer = Andre + Claudia"></div>
+    <div class="f-daten"><label for="eWer">Zahlt</label><select id="eWer"><option>Andre</option><option>Claudia</option></select></div>
+    <div class="w2"><label for="eNotiz">Notiz (optional)</label><input id="eNotiz" placeholder="z. B. Preiserhöhung laut Schreiben vom …"></div>
+  </div>
+  <datalist id="katList"></datalist>
+  <p class="note" id="edErr" style="color:var(--bad)"></p>
+  <div class="row"><button onclick="dlgEdit.close()">Abbrechen</button><button class="primary" id="edSave" onclick="saveEdit()">Speichern</button></div>
 </dialog>
 
 <script>
@@ -196,7 +260,19 @@ function showEmpty(b){$("#empty").classList.toggle("hidden",!b);document.querySe
 /* ---------- Datenlogik ---------- */
 const fixPosten=()=>D.fixkosten?.posten||[];
 const share=(a,c)=>person==="andre"?a:person==="claudia"?c:a+c;
-function fixTotal(){return fixPosten().reduce((s,p)=>s+share(p.andre,p.claudi),0)}
+const mEnd=m=>{const [y,mo]=m.split("-").map(Number);return `${m}-${String(new Date(y,mo,0).getDate()).padStart(2,"0")}`};
+// Version 2: jeder Posten hat Perioden {ab,bis,andre,claudi,gesamt}; ältere Dateien ohne Perioden gelten immer
+function perioden(p){return p.perioden||[{ab:"1900-01-01",bis:null,andre:p.andre,claudi:p.claudi,gesamt:p.gesamt}]}
+function periodeIn(p,m){return perioden(p).find(x=>x.ab<=mEnd(m)&&(!x.bis||x.bis>=m+"-01"))}
+function fixAktiv(m){return fixPosten().map(p=>({p,per:periodeIn(p,m)})).filter(x=>x.per)}
+function fixTotal(m){return fixAktiv(m).reduce((s,x)=>s+share(x.per.andre,x.per.claudi),0)}
+function fixStart(){const a=fixPosten().flatMap(p=>perioden(p).map(x=>x.ab)).filter(x=>x>"1900").sort();return a[0]?ym(a[0]):null}
+function monthsBetween(a,b){const out=[];let [y,m]=a.split("-").map(Number);while(`${y}-${String(m).padStart(2,"0")}`<=b){out.push(`${y}-${String(m).padStart(2,"0")}`);m++;if(m>12){m=1;y++}}return out}
+function bisher(p,m){ // angefallene Kosten dieses Postens von Beginn bis Ende des gewählten Monats
+  return perioden(p).reduce((s,x)=>{if(x.ab<="1900")return s;const bis=x.bis&&ym(x.bis)<m?ym(x.bis):m;if(ym(x.ab)>bis)return s;
+    return s+monthsBetween(ym(x.ab),bis).length*share(x.andre,x.claudi)},0)}
+// Tabellen: Spaltennamen als data-label für die Kartenansicht am Handy
+function labelTable(t){const h=[...t.querySelectorAll("thead th")].map(x=>x.textContent);t.querySelectorAll("tbody tr").forEach(r=>[...r.children].forEach((td,i)=>{if(!td.hasAttribute("colspan"))td.dataset.label=h[i]||""}))}
 function einnahmen(){const e=D.fixkosten?.einnahmen||{};const a=(e.andre_netto||0)+(e.mieteinnahme||0),c=e.claudi_netto||0;return share(a,c)}
 const swRows=()=>(D.splitwise?.eintraege||[]);
 const ladenRows=()=>(D.laden?.vorgaenge||[]);
@@ -228,16 +304,16 @@ function baseOpts(extra={}){const t2=css("--text-2"),ln=css("--line");return Obj
   scales:{x:{grid:{display:false},ticks:{color:t2},stacked:true},y:{grid:{color:ln},border:{display:false},ticks:{color:t2,callback:v=>eur(v)},stacked:true}}},extra)}
 
 function rUeb(m){
-  const ein=einnahmen(),fix=fixTotal(),lad=ladenPerson(ladenMonat(m)),auto=swMonat(m,"Ausgabe");
+  const ein=einnahmen(),fix=fixTotal(m),lad=ladenPerson(ladenMonat(m)),auto=swMonat(m,"Ausgabe");
   const frei=ein-fix-lad-auto;
   const who=person==="alle"?"Andre + Claudia":person==="andre"?"Andre":"Claudia";
   $("#kpis").innerHTML=kpi("Einnahmen (netto)",eur(ein),who+(person!=="claudia"?" · inkl. Mieteinnahme":""))+
-    kpi("Fixkosten",eur(fix),`${fixPosten().length} Posten laut Kostenberechnung`)+
+    kpi("Fixkosten",eur(fix),`${fixAktiv(m).length} aktive Posten`)+
     kpi("Laden",eur(lad),person==="alle"?`${monthName(m)} · laut Rechnungen`:`Anteil ${Math.round((person==="andre"?ladenQuote():1-ladenQuote())*100)} % laut Splitwise`)+
     kpi("Sonstiges Auto",eur(auto),"Splitwise ohne Laden & Ausgleich")+
     kpi("Frei verfügbar",eur(frei),"Einnahmen − alle Kosten",frei>=0?"pos":"neg");
   // Aufteilung als horizontale Balken (Kategorie-Summen)
-  const kat={};fixPosten().forEach(p=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(p.andre,p.claudi));
+  const kat={};fixAktiv(m).forEach(({p,per})=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(per.andre,per.claudi));
   kat["Laden"]=(kat["Laden"]||0)+lad;kat["Sonstiges Auto"]=auto;
   const ent=Object.entries(kat).filter(([,v])=>v>0.5).sort((a,b)=>b[1]-a[1]);
   $("#cMix").parentElement.style.height=Math.max(240,ent.length*30+50)+"px";
@@ -251,18 +327,41 @@ function rUeb(m){
     {label:"Sonstiges Auto",data:L.map(k=>swMonat(k,"Ausgabe")),backgroundColor:css("--s2"),borderRadius:{topLeft:4,topRight:4},borderSkipped:"bottom"}]},options:baseOpts()});
 }
 
-function rFix(){
-  const kat={};fixPosten().forEach(p=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(p.andre,p.claudi));
+function rFix(m){
+  const akt=fixAktiv(m),tot=fixTotal(m),L=last12(m),vm=L[L.length-2],vj=L[0];
+  const d1=tot-fixTotal(vm),d12=tot-fixTotal(vj);
+  const st0=fixStart();const vor=k=>!st0||k<st0;
+  const fmtD=(d,k)=>vor(k)?"–":Math.abs(d)<0.005?"unverändert":(d>0?"+":"−")+eur(Math.abs(d),2);
+  $("#kpisFix").innerHTML=kpi("Fixkosten im Monat",eur(tot,2),monthName(m))+kpi("Pro Jahr",eur(tot*12),"bei gleichbleibenden Posten")+
+    kpi("ggü. Vormonat",fmtD(d1,vm),vor(vm)?"vor Beginn der Erfassung":monthName(vm),!vor(vm)&&d1>0.005?"neg":!vor(vm)&&d1<-0.005?"pos":"")+kpi("ggü. Vorjahr",fmtD(d12,vj),vor(vj)?"vor Beginn der Erfassung":monthName(vj),!vor(vj)&&d12>0.005?"neg":!vor(vj)&&d12<-0.005?"pos":"");
+  // Verlauf
+  const st=fixStart();const V=monthsBetween(st&&st<=m?st:m,m).slice(-36);
+  $("#hintFixVerlauf").textContent=st?`Summe der aktiven Posten je Monat · erfasst seit ${monthName(st)} – der Verlauf wächst mit jeder Änderung`:"";
+  mkChart("cFixVerlauf",{type:V.length<4?"bar":"line",data:{labels:V.map(monthShort),datasets:[{label:"Fixkosten",data:V.map(k=>fixTotal(k)),borderColor:css("--s1"),backgroundColor:css("--s1"),pointRadius:2,stepped:true,maxBarThickness:48,borderRadius:4}]},
+    options:baseOpts({scales:{x:{grid:{display:false},ticks:{color:css("--text-2")}},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}}}})});
+  // Kategorien
+  const kat={};akt.forEach(({p,per})=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(per.andre,per.claudi));
   const ent=Object.entries(kat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   $("#cFix").parentElement.style.height=Math.max(240,ent.length*30+50)+"px";
-  $("#hintFix").textContent=`${eur(fixTotal())} pro Monat · ${eur(fixTotal()*12)} im Jahr`;
+  $("#hintFix").textContent=`${eur(tot)} pro Monat · ${eur(tot*12)} im Jahr`;
   mkChart("cFix",{type:"bar",data:{labels:ent.map(e=>e[0]),datasets:[{label:"Monatlich",data:ent.map(e=>e[1]),backgroundColor:css("--s1"),borderRadius:4,barThickness:18}]},
     options:baseOpts({indexAxis:"y",scales:{x:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}},y:{grid:{display:false},ticks:{color:css("--text"),autoSkip:false}}},
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>" "+eur(c.parsed.x,2)}}}})});
-  let h=`<thead><tr><th>Posten</th><th>Anbieter</th><th class="n">Andre</th><th class="n">Claudia</th><th class="n">Gesamt</th><th>Zahlt</th></tr></thead><tbody>`,last=null;
-  fixPosten().forEach(p=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="6">${p.kategorie}</td></tr>`;last=p.kategorie}
-    h+=`<tr><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}</td><td>${p.anbieter||""}</td><td class="n">${eur(p.andre,2)}</td><td class="n">${eur(p.claudi,2)}</td><td class="n">${eur(p.gesamt,2)}</td><td>${p.wer_zahlt||""}</td></tr>`});
-  $("#tFix").innerHTML=h+"</tbody>";
+  // Tabelle: aktive Posten + im Monat oder früher beendete
+  const rows=fixPosten().map(p=>{const per=periodeIn(p,m);const ps=perioden(p);const lastP=ps[ps.length-1];
+    const beendet=!per&&lastP.bis&&lastP.bis<m+"-01";const kommt=!per&&!beendet;return {p,per:per||ps.find(x=>x.ab>mEnd(m))||lastP,beendet,kommt}})
+    .sort((a,b)=>a.p.kategorie.localeCompare(b.p.kategorie,"de")||a.beendet-b.beendet||a.p.posten.localeCompare(b.p.posten,"de"));
+  const w=person==="alle";
+  let h=`<thead><tr><th>Posten</th><th>Anbieter</th><th class="n">Andre</th><th class="n">Claudia</th><th class="n">Gesamt</th><th class="n">bisher</th><th></th></tr></thead><tbody>`,last=null;
+  rows.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="7">${p.kategorie}</td></tr>`;last=p.kategorie}
+    const seit=per.ab>"1900"?`seit ${new Date(per.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})}`:"";
+    const info=kommt?`startet ${new Date(per.ab).toLocaleDateString("de-DE")}`:beendet?`beendet ${new Date(per.bis).toLocaleDateString("de-DE")}`:per.bis?`endet ${new Date(per.bis).toLocaleDateString("de-DE")}`:seit;
+    h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}<span class="sub2">${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}</span></td><td>${p.anbieter||""}</td>
+      <td class="n">${eur(per.andre,2)}</td><td class="n">${eur(per.claudi,2)}</td><td class="n">${eur(per.gesamt,2)}</td><td class="n">${eur(bisher(p,m))}</td>
+      <td class="n act">${beendet?"":`<button class="btn-s" onclick="openEdit('${p.id}')" aria-label="${p.posten} ändern">✎</button>`}</td></tr>`});
+  $("#tFix").innerHTML=h+"</tbody>";labelTable($("#tFix"));
+  const log=(D.fixkosten?.aenderungen||[]).slice(-30);
+  $("#logFix").innerHTML=log.slice().reverse().map(x=>`<li><strong>${new Date(x.zeit).toLocaleDateString("de-DE")}</strong> · ${x.beschreibung}${x.von?` <span class="sub2">von ${x.von}</span>`:""}</li>`).join("")||"<li>Noch keine Änderungen.</li>";
 }
 
 function kmPer100(m){
@@ -296,9 +395,10 @@ function rLaden(m){
   let t=`<thead><tr><th>Anbieter</th><th class="n">Vorgänge</th><th class="n">kWh</th><th class="n">Kosten</th><th class="n">€/kWh</th></tr></thead><tbody>`;
   PROV.forEach(p=>{const r=rs.filter(x=>x.anbieter===p);if(!r.length)return;const k=r.reduce((s,x)=>s+(x.kwh||0),0),b=r.reduce((s,x)=>s+(x.betrag||0),0),bk=r.filter(x=>x.kwh>0).reduce((s,x)=>s+(x.betrag||0),0);
     t+=`<tr><td>${p}</td><td class="n">${r.length}</td><td class="n">${num(k)}</td><td class="n">${eur(b,2)}</td><td class="n">${k&&p!=="Sonstige"?num(bk/k,3):"–"}</td></tr>`});
-  $("#tAnb").innerHTML=t+"</tbody>";
-  $("#tLaden").innerHTML=`<thead><tr><th>Datum</th><th>Anbieter</th><th>Ort</th><th class="n">kWh</th><th class="n">Betrag</th><th class="n">€/kWh</th></tr></thead><tbody>`+
-    (rows.length?rows.map(x=>`<tr><td>${new Date(x.datum).toLocaleDateString("de-DE")}</td><td>${x.anbieter}</td><td>${x.ort||""}</td><td class="n">${num(x.kwh,3)}</td><td class="n">${eur(x.betrag,2)}</td><td class="n">${x.kwh&&x.betrag?num(x.betrag/x.kwh,3):"–"}</td></tr>`).join(""):`<tr><td colspan="6">Keine Ladevorgänge in diesem Monat.</td></tr>`)+"</tbody>";
+  $("#tAnb").innerHTML=t+"</tbody>";labelTable($("#tAnb"));
+  $("#tLaden").innerHTML=`<thead><tr><th>Ladung</th><th class="n">kWh</th><th class="n">Betrag</th><th class="n">€/kWh</th></tr></thead><tbody>`+
+    (rows.length?rows.map(x=>`<tr><td>${x.ort||x.anbieter}<span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · ${x.anbieter}</span></td><td class="n">${x.kwh?num(x.kwh,1):"–"}</td><td class="n">${eur(x.betrag,2)}</td><td class="n">${x.kwh&&x.betrag?num(x.betrag/x.kwh,3):"–"}</td></tr>`).join(""):`<tr><td colspan="4">Keine Ladevorgänge in diesem Monat.</td></tr>`)+"</tbody>";
+  labelTable($("#tLaden"));
 }
 
 function rSw(m){
@@ -309,9 +409,83 @@ function rSw(m){
     kpi("Offener Saldo",eur(Math.abs(saldo),2),Math.abs(saldo)<0.01?"ausgeglichen":saldo>0?"Claudia schuldet Andre":"Andre schuldet Claudia")+
     kpi("Einträge",rows.length,monthName(m));
   $("#hintSw").textContent=`Quelle: ${D.splitwise?.quelle||"Splitwise"} · Ausgleichszahlungen zählen nicht als Ausgabe`;
-  $("#tSw").innerHTML=`<thead><tr><th>Datum</th><th>Beschreibung</th><th>Typ</th><th class="n">Betrag</th><th class="n">Andre</th><th class="n">Claudia</th><th>Bezahlt</th></tr></thead><tbody>`+
-    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${new Date(x.datum).toLocaleDateString("de-DE")}</td><td>${x.beschreibung}</td><td><span class="pill">${x.typ}</span></td><td class="n">${eur(x.kosten,2)}</td><td class="n">${eur(x.anteil_andre,2)}</td><td class="n">${eur(x.anteil_claudia,2)}</td><td>${x.bezahlt_von}</td></tr>`).join(""):`<tr><td colspan="7">Keine Einträge in diesem Monat.</td></tr>`)+"</tbody>";
+  $("#tSw").innerHTML=`<thead><tr><th>Eintrag</th><th class="n">Betrag</th><th class="n">Andre</th><th class="n">Claudia</th></tr></thead><tbody>`+
+    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.beschreibung} <span class="pill">${x.typ}</span><span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · bezahlt von ${x.bezahlt_von}${x.kategorie?" · "+x.kategorie:""}</span></td><td class="n">${eur(x.kosten,2)}</td><td class="n">${eur(x.anteil_andre,2)}</td><td class="n">${eur(x.anteil_claudia,2)}</td></tr>`).join(""):`<tr><td colspan="4">Keine Einträge in diesem Monat.</td></tr>`)+"</tbody>";
+  labelTable($("#tSw"));
 }
+
+
+/* ---------- Fixkosten bearbeiten (speichert in data/fixkosten.json im privaten Repo) ---------- */
+let edId=null;
+const artRadios=()=>[...document.querySelectorAll('#edArten input')];
+const numIn=v=>{v=String(v||"").trim().replace(/\s|€/g,"");if(!v)return null;v=v.includes(",")?v.replace(/\./g,"").replace(",","."):v;const n=Number(v);return isNaN(n)?NaN:Math.round(n*100)/100};
+const today=()=>new Date().toISOString().slice(0,10);
+function edSync(){const neu=edId===null,art=neu?"neu":artRadios().find(r=>r.checked).value;
+  $("#edArten").classList.toggle("hidden",neu);
+  document.querySelectorAll("#dlgEdit .f-betrag").forEach(e=>e.classList.toggle("hidden",art==="wegfall"));
+  document.querySelectorAll("#dlgEdit .f-daten").forEach(e=>e.classList.toggle("hidden",art==="wegfall"&&e.querySelector("#eDatum")===null));
+  $("#eDatumL").textContent=art==="wegfall"?"Letzter Tag / Kündigung wirksam zum":art==="korrektur"?"Gilt seit (Beginn dieses Betrags)":"Gültig ab";
+  $("#edSave").textContent=neu?"Posten anlegen":art==="wegfall"?"Posten beenden":"Speichern"}
+artRadios().forEach(r=>r.onchange=()=>{edSync();const p=fixPosten().find(x=>x.id===edId);if(!p)return;const per=perioden(p).at(-1);
+  $("#eDatum").value=r.value==="korrektur"?(per.ab>"1900"?per.ab:""):today()});
+function openEdit(id){edId=id;$("#edErr").textContent="";
+  $("#katList").innerHTML=[...new Set(fixPosten().map(p=>p.kategorie))].sort().map(k=>`<option value="${k}">`).join("");
+  const p=fixPosten().find(x=>x.id===id);
+  if(p){const per=perioden(p).at(-1);$("#edTitle").textContent=p.posten+" ändern";
+    $("#edInfo").textContent=`Aktuell ${eur(per.gesamt,2)} im Monat (Andre ${eur(per.andre,2)}, Claudia ${eur(per.claudi,2)})`+(per.ab>"1900"?` seit ${new Date(per.ab).toLocaleDateString("de-DE")}`:"");
+    artRadios()[0].checked=true;$("#eDatum").value=per.ab>"1900"?per.ab:"";ePosten.value=p.posten;eKat.value=p.kategorie;eAnb.value=p.anbieter||"";
+    eA.value=String(per.andre).replace(".",",");eC.value=String(per.claudi).replace(".",",");eG.value=String(per.gesamt).replace(".",",");eWer.value=p.wer_zahlt||"Andre"}
+  else{$("#edTitle").textContent="Neuer Posten";$("#edInfo").textContent="Neu abgeschlossener Vertrag oder neue regelmäßige Zahlung.";
+    $("#eDatum").value=today();ePosten.value="";eKat.value="";eAnb.value="";eA.value="";eC.value="";eG.value="";eWer.value="Andre"}
+  eNotiz.value="";edSync();dlgEdit.showModal()}
+
+function applyEdit(data,op){ // wendet die Änderung auf eine frische Kopie der Datei an
+  data.version=2;data.posten=data.posten||[];data.aenderungen=data.aenderungen||[];
+  const dm1=d=>{const x=new Date(d+"T12:00:00");x.setDate(x.getDate()-1);return x.toISOString().slice(0,10)};
+  const fmt=v=>eur(v,2),dd=d=>new Date(d).toLocaleDateString("de-DE");let text;
+  if(op.art==="neu"){let id=(op.kategorie+"-"+op.posten).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+    while(data.posten.some(p=>p.id===id))id+="-2";
+    data.posten.push({id,kategorie:op.kategorie,posten:op.posten,anbieter:op.anbieter||null,wer_zahlt:op.wer,gemeinsam:op.andre>0&&op.claudi>0,
+      perioden:[{ab:op.datum,bis:null,andre:op.andre,claudi:op.claudi,gesamt:op.gesamt}]});
+    text=`Neuer Posten „${op.posten}“ (${op.kategorie}) ab ${dd(op.datum)}: ${fmt(op.gesamt)}/Monat`;op.id=id}
+  else{const p=data.posten.find(x=>x.id===op.id);if(!p)throw new Error("Posten nicht mehr vorhanden – bitte neu laden.");
+    if(!p.perioden)p.perioden=perioden(p);const cur=p.perioden.at(-1);
+    if(op.art==="korrektur"){const alt=`${fmt(cur.gesamt)}`;Object.assign(cur,{andre:op.andre,claudi:op.claudi,gesamt:op.gesamt});if(op.datum)cur.ab=op.datum;
+      Object.assign(p,{posten:op.posten,kategorie:op.kategorie,anbieter:op.anbieter||null,wer_zahlt:op.wer});
+      text=`Korrektur „${p.posten}“: ${alt} → ${fmt(op.gesamt)}/Monat (Fehleintrag, rückwirkend)`}
+    else if(op.art==="aenderung"){if(op.datum<=cur.ab)throw new Error("Das Datum muss nach dem Beginn des bisherigen Betrags liegen – sonst „Fehleintrag korrigieren“ wählen.");
+      const alt=cur.gesamt;cur.bis=dm1(op.datum);p.perioden.push({ab:op.datum,bis:null,andre:op.andre,claudi:op.claudi,gesamt:op.gesamt});
+      Object.assign(p,{posten:op.posten,kategorie:op.kategorie,anbieter:op.anbieter||null,wer_zahlt:op.wer});
+      text=`Änderung „${p.posten}“ ab ${dd(op.datum)}: ${fmt(alt)} → ${fmt(op.gesamt)}/Monat (${op.gesamt>=alt?"+":"−"}${fmt(Math.abs(op.gesamt-alt))})`}
+    else{if(op.datum<cur.ab)throw new Error("Das Enddatum liegt vor dem Beginn des Postens.");cur.bis=op.datum;
+      text=`Wegfall „${p.posten}“ zum ${dd(op.datum)} (bisher ${fmt(cur.gesamt)}/Monat)`}}
+  if(op.notiz)text+=` – ${op.notiz}`;
+  data.aenderungen.push({zeit:new Date().toISOString().slice(0,16),art:op.art,posten_id:op.id,von:"Andre",beschreibung:text});
+  data.stand=new Date().toISOString().slice(0,16);return text}
+
+const b64=str=>{const b=new TextEncoder().encode(str);let s="";b.forEach(x=>s+=String.fromCharCode(x));return btoa(s)};
+const unb64=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,"")),c=>c.charCodeAt(0)));
+async function saveEdit(){
+  const neu=edId===null,art=neu?"neu":artRadios().find(r=>r.checked).value;
+  const op={art,id:edId,datum:$("#eDatum").value,posten:ePosten.value.trim(),kategorie:eKat.value.trim(),anbieter:eAnb.value.trim(),wer:eWer.value,notiz:eNotiz.value.trim(),
+    andre:numIn(eA.value)??0,claudi:numIn(eC.value)??0};op.gesamt=numIn(eG.value)??Math.round((op.andre+op.claudi)*100)/100;
+  const err=m=>{$("#edErr").textContent=m};
+  if(art!=="wegfall"&&[op.andre,op.claudi,op.gesamt].some(isNaN))return err("Bitte Beträge als Zahl eingeben, z. B. 12,99.");
+  if((art==="neu"||art==="aenderung"||art==="wegfall")&&!op.datum)return err("Bitte ein Datum angeben.");
+  if(art!=="wegfall"&&(!op.posten||!op.kategorie))return err("Posten und Kategorie ausfüllen.");
+  const c=cfg();if(!c.owner||!c.token)return err("Zum Speichern muss die Datenquelle (⚙︎) eingerichtet sein.");
+  const url=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/data/fixkosten.json`,H={Authorization:`Bearer ${c.token}`,Accept:"application/vnd.github+json"};
+  $("#edSave").disabled=true;err("Speichere …");
+  try{for(let versuch=0;versuch<2;versuch++){
+      const g=await fetch(url,{headers:H,cache:"no-store"});if(!g.ok)throw new Error(`Laden fehlgeschlagen (${g.status})`);
+      const meta=await g.json();const data=JSON.parse(unb64(meta.content));const text=applyEdit(data,op);
+      const r=await fetch(url,{method:"PUT",headers:H,body:JSON.stringify({message:`App: ${text}`.slice(0,120),content:b64(JSON.stringify(data,null,1)),sha:meta.sha})});
+      if(r.status===409||r.status===422)continue;
+      if(r.status===403||r.status===404)throw new Error("Dein Zugangsschlüssel darf nur lesen. Zum Ändern braucht Andres Schlüssel „Contents: Read and write“ für Finanzdaten.");
+      if(!r.ok)throw new Error(`GitHub antwortet ${r.status}`);
+      D.fixkosten=data;dlgEdit.close();render();return}
+    throw new Error("Gleichzeitige Änderung – bitte noch einmal speichern.")}
+  catch(e){err(e.message)}finally{$("#edSave").disabled=false}}
 
 /* ---------- Bedienung ---------- */
 $("#month").onchange=render;
