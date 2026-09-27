@@ -403,7 +403,7 @@ function rFix(m){
   rowsQ.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="8">${p.kategorie}</td></tr>`;last=p.kategorie}
     const seit=per.ab>"1900"?`seit ${new Date(per.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})}`:"";
     const info=kommt?`startet ${new Date(per.ab).toLocaleDateString("de-DE")}`:beendet?`beendet ${new Date(per.bis).toLocaleDateString("de-DE")}`:per.bis?`endet ${new Date(per.bis).toLocaleDateString("de-DE")}`:seit;
-    h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}<span class="sub2">${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}</span></td><td>${p.anbieter||""}</td>
+    h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}<span class="sub2">${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}${p.notiz?` · ${p.notiz}`:""}</span></td><td>${p.anbieter||""}</td>
       <td class="n">${eur(per.andre,2)}</td><td class="n">${eur(per.claudi,2)}</td><td class="n">${per.mutti?eur(per.mutti,2):""}</td><td class="n">${eur(per.gesamt,2)}</td><td class="n">${eur(bisher(p,m))}</td>
       <td class="n act">${beendet?"":`<button class="btn-s" onclick="openEdit('${p.id}')" aria-label="${p.posten} ändern">✎</button>`}</td></tr>`});
   $("#tFix").innerHTML=h+"</tbody>";labelTable($("#tFix"));
@@ -540,12 +540,12 @@ async function saveEdit(){
 
 /* ---------- Schulden bei Mutti ---------- */
 const SM=()=>D.fixkosten?.schulden_mutti||{};
-function tilgung(m){const rid=SM().rate_posten;return fixAktiv(m).reduce((s,{p,per})=>s+(per.mutti||0)+(p.id===rid?per.gesamt:0),0)}
+function tilgung(m){const r=SM().rate_posten,ids=Array.isArray(r)?r:[r];return fixAktiv(m).reduce((s,{p,per})=>s+(per.mutti||0)+(ids.includes(p.id)?per.gesamt:0),0)}
 function rMutti(m){
   const sm=SM(),t=tilgung(m),st=sm.start_datum?ym(sm.start_datum):fixStart();
   const nutz=fixAktiv(m).filter(x=>x.per.mutti>0);
   const bis=st&&st<=m?monthsBetween(st,m):[];const getilgt=bis.reduce((s,k)=>s+tilgung(k),0);
-  let h=kpi("Tilgung pro Monat",eur(t,2),`Rate ${eur(t-nutz.reduce((s,x)=>s+x.per.mutti,0),2)} + Mitnutzung ${eur(nutz.reduce((s,x)=>s+x.per.mutti,0),2)}`)+
+  let h=kpi("Tilgung pro Monat",eur(t,2),`Raten ${eur(t-nutz.reduce((s,x)=>s+x.per.mutti,0),2)} + Mitnutzung ${eur(nutz.reduce((s,x)=>s+x.per.mutti,0),2)}`)+
     kpi("Getilgt",eur(getilgt,2),st?`seit ${monthName(st)}`:"");
   if(sm.start_betrag!=null){const rest=Math.max(0,sm.start_betrag-getilgt);const n=t>0?Math.ceil(rest/t):null;
     let frei="";if(n!=null){let [y,mo]=m.split("-").map(Number);mo+=n;while(mo>12){mo-=12;y++}frei=monthName(`${y}-${String(mo).padStart(2,"0")}`)}
