@@ -71,6 +71,7 @@ dialog input{width:100%}
 .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 .note{font-size:12.5px;color:var(--text-3);margin-top:10px}
 .hidden{display:none!important}
+nav.dim button{opacity:.55}
 .tablewrap{overflow-x:hidden}
 table{table-layout:auto}
 td{overflow-wrap:anywhere}
@@ -175,6 +176,21 @@ dialog select,dialog input,dialog textarea{width:100%}
       <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
     <p class="note">Muttis Anteile (Spalte „Mutti“) werden mit ihrem Darlehen verrechnet – Details im Tab „Darlehen Mutti“.</p>
     <div class="card full"><h2>Änderungsprotokoll</h2><p class="hint">Neueste zuerst</p><ol class="log" id="logFix" reversed></ol></div>
+  </section>
+
+  <section id="tab-jahr" class="hidden">
+    <h2 id="jTitel" style="margin:0 0 4px;font-size:20px"></h2><p class="hint" id="jHint" style="margin:0 0 12px"></p>
+    <div class="kpis" id="kpisJahr"></div>
+    <div class="card"><h2>Monat für Monat</h2><p class="hint">Haushaltsausgaben je nach Sicht oben (Gemeinsam/Andre/Claudia)</p><div class="legend" id="legJahr"></div><div class="chart" style="height:320px"><canvas id="cJahr"></canvas></div></div>
+    <div class="grid2 full">
+      <div class="card"><h2>Wofür das Geld ging</h2><p class="hint" id="jHintKat"></p><div class="chart" style="height:360px"><canvas id="cJahrKat"></canvas></div></div>
+      <div class="card"><h2>Die größten Einzelposten</h2><p class="hint">Variable Ausgaben laut Splitwise (Anteil je nach Sicht)</p><div class="tablewrap"><table id="tJahrTop" class="resp"></table></div></div>
+    </div>
+    <div class="grid2 full">
+      <div class="card"><h2>Fixkosten – was sich geändert hat</h2><div class="tablewrap"><table id="tJahrFix" class="resp"></table></div></div>
+      <div class="card"><h2>Andres Konto im Jahr</h2><p class="hint">nur Andre · eigene Ausgaben ohne Splitwise</p><div class="tablewrap"><table id="tJahrKonto" class="resp"></table></div></div>
+    </div>
+    <div class="card full"><h2>Auto</h2><p class="hint" id="jHintAuto"></p><div class="kpis" id="kpisJahrAuto" style="margin:0"></div></div>
   </section>
 
   <section id="tab-mutti" class="hidden">
@@ -326,7 +342,8 @@ function bisher(p,m){ // angefallene Kosten dieses Postens von Beginn bis Ende d
     return s+monthsBetween(ym(x.ab),bis).length*share(x.andre,x.claudi)},0)}
 // Tabellen: Spaltennamen als data-label für die Kartenansicht am Handy
 function labelTable(t){const h=[...t.querySelectorAll("thead th")].map(x=>x.textContent);t.querySelectorAll("tbody tr").forEach(r=>[...r.children].forEach((td,i)=>{if(!td.hasAttribute("colspan"))td.dataset.label=h[i]||""}))}
-function einnahmen(){const e=D.fixkosten?.einnahmen||{};const a=(e.andre_netto||0)+(e.mieteinnahme||0),c=e.claudi_netto||0;return share(a,c)}
+function andreKontoEin(m){const r=(D.konto_andre?.buchungen||[]).filter(x=>ym(x.datum)===m&&x.bereich==="Einnahme"&&x.kategorie!=="Familie");return r.length?r.reduce((s,x)=>s+x.betrag,0):null}
+function einnahmen(m){const e=D.fixkosten?.einnahmen||{};const k=m?andreKontoEin(m):null;const a=k??((e.andre_netto||0)+(e.mieteinnahme||0)),c=e.claudi_netto||0;return share(a,c)}
 const swRows=()=>(D.splitwise?.eintraege||[]);
 const ladenRows=()=>(D.laden?.vorgaenge||[]);
 // Anteil Andre an Ladekosten = Verhältnis der Splitwise-Ladebuchungen der letzten 12 Monate
@@ -341,14 +358,17 @@ function last12(m){const out=[];let [y,mo]=m.split("-").map(Number);for(let i=11
 /* ---------- Rendering ---------- */
 function init(){
   const ms=months();const sel=$("#month");const cur=sel.value;
-  sel.innerHTML=ms.slice().reverse().map(m=>`<option value="${m}">${monthName(m)}</option>`).join("");
-  sel.value=cur&&ms.includes(cur)?cur:ms[ms.length-1];
+  const years=[...new Set(ms.map(m=>m.slice(0,4)))].filter(y=>ms.filter(m=>m.startsWith(y)).length>=6&&(!fixStart()||y>fixStart().slice(0,4)||fixStart().endsWith("-01"))).reverse();
+  sel.innerHTML=`<optgroup label="Jahresrückblick">`+years.map(y=>`<option value="${y}">Jahr ${y}</option>`).join("")+`</optgroup><optgroup label="Monate">`+ms.slice().reverse().map(m=>`<option value="${m}">${monthName(m)}</option>`).join("")+`</optgroup>`;
+  sel.value=cur&&(ms.includes(cur)||years.includes(cur))?cur:ms[ms.length-1];
   const st=FILES.map(f=>D[f]?.stand?`${f}: ${new Date(D[f].stand).toLocaleString("de-DE",{dateStyle:"short",timeStyle:"short"})}`:null).filter(Boolean);
   $("#stand").textContent="Datenstand – "+st.join(" · ");
   render();
 }
 function kpi(label,value,sub,cls=""){return `<div class="card kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`}
 function render(){const m=$("#month").value;if(!m)return;
+  const isY=/^\d{4}$/.test(m);document.querySelectorAll("main section").forEach(x=>x.classList.toggle("hidden",isY?x.id!=="tab-jahr":x.id!=="tab-"+tab));
+  document.querySelector("nav").classList.toggle("dim",isY);if(isY)return rJahr(m);
   ({uebersicht:rUeb,rueckblick:rRb,fix:rFix,mutti:rMutti,variabel:rVar,laden:rLaden,splitwise:rSw,konto:rKonto})[tab](m)}
 
 function mkChart(id,conf){charts[id]?.destroy();charts[id]=new Chart(document.getElementById(id),conf);return charts[id]}
@@ -357,12 +377,12 @@ function baseOpts(extra={}){const t2=css("--text-2"),ln=css("--line");return Obj
   scales:{x:{grid:{display:false},ticks:{color:t2},stacked:true},y:{grid:{color:ln},border:{display:false},ticks:{color:t2,callback:v=>eur(v)},stacked:true}}},extra)}
 
 function rUeb(m){
-  const ein=einnahmen(),fix=fixTotal(m),lad=ladenPerson(ladenMonat(m)),auto=swMonat(m,"Ausgabe");
+  const ein=einnahmen(m),fix=fixTotal(m),kEin=andreKontoEin(m),lad=ladenPerson(ladenMonat(m)),auto=swMonat(m,"Ausgabe");
   const vari=D.splitwise_variabel&&!D.splitwise_variabel.error?varMonat(m):0;
   const frei=ein-fix-lad-auto-vari;
   const who=person==="alle"?"Andre + Claudia":person==="andre"?"Andre":"Claudia";
-  $("#kpis").innerHTML=kpi("Einnahmen (netto)",eur(ein),who+(person!=="claudia"?" · inkl. Mieteinnahme":""))+
-    kpi("Fixkosten",eur(fix),`${fixAktiv(m).length} aktive Posten`)+
+  $("#kpis").innerHTML=kpi("Einnahmen (netto)",eur(ein),who+(person==="claudia"?" · laut Kostentabelle":kEin!=null?" · Andre laut Konto (Gehalt, Miete u. a.)":" · Andre laut Kostentabelle (noch kein Kontoauszug)"))+
+    kpi("Fixkosten",eur(fix),`${fixAktiv(m).length} aktive Posten`+(person==="alle"?"":" · dein Anteil"))+
     kpi("Laden",eur(lad),person==="alle"?`${monthName(m)} · laut Rechnungen`:`Anteil ${Math.round((person==="andre"?ladenQuote():1-ladenQuote())*100)} % laut Splitwise`)+
     kpi("Sonstiges Auto",eur(auto),"Splitwise ohne Laden & Ausgleich")+
     kpi("Variable Kosten",eur(vari),"Splitwise: Alltag, Hobby, Urlaub")+
@@ -723,13 +743,66 @@ function rRb(m){
   h+=`<tr class="cat"><td>Ø pro Monat</td><td class="n">${eur(av(r=>r.fix))}</td><td class="n">${eur(av(r=>r.laden+r.auto))}</td><td class="n">${eur(av(r=>r.alltag+r.hobby+r.anlass))}</td><td class="n">${eur(avg)}</td><td></td><td></td></tr>`;
   $("#tRb").innerHTML=h+"</tbody>";labelTable($("#tRb"))}
 
+
+/* ---------- Jahresrückblick ---------- */
+function rJahr(y){
+  const M=Array.from({length:12},(_,i)=>`${y}-${String(i+1).padStart(2,"0")}`),alle=months(),MD=M.filter(k=>alle.includes(k)&&k<=alle.at(-1));
+  const vy=String(+y-1),MV=MD.map(k=>vy+k.slice(4));
+  const rows=MD.map(k=>({k,...hausMonat(k)}));rows.forEach(r=>r.sum=RBS.reduce((s,[x])=>s+r[x],0));
+  const S=x=>rows.reduce((s,r)=>s+r[x],0),tot=rows.reduce((s,r)=>s+r.sum,0);
+  const prev=MV.map(k=>({k,...hausMonat(k)})).map(r=>RBS.reduce((s,[x])=>s+r[x],0)),totV=prev.reduce((s,v)=>s+v,0);
+  const st=fixStart(),hasPrev=MV.some(k=>alle.includes(k))&&(!st||MV[0]>=st);
+  const hz=M=>varRows().filter(x=>/hochzeit/i.test(x.gruppe)&&M.includes(ym(x.datum))).reduce((s,x)=>s+share(x.anteil_andre,x.anteil_claudia),0);
+  const hzY=hz(MD),hzV=hz(MV),ohne=tot-hzY,ohneV=totV-hzV;
+  const who=person==="alle"?"Andre + Claudia":person==="andre"?"Andres Anteil":"Claudias Anteil";
+  const voll=MD.length===12;
+  $("#jTitel").textContent=`Jahresrückblick ${y}`;
+  $("#jHint").textContent=`${monthName(MD[0])} bis ${monthName(MD.at(-1))}${voll?"":` (${MD.length} Monate, Jahr läuft noch)`} · ${who} · zurück zu den Monaten: oben einen Monat wählen`;
+  const kE=MD.map(k=>andreKontoEin(k)).filter(v=>v!=null),kEsum=kE.reduce((s,v)=>s+v,0);
+  $("#kpisJahr").innerHTML=kpi("Ausgaben gesamt",eur(tot),`Ø ${eur(tot/MD.length)} pro Monat`+(hzY?` · davon Hochzeit ${eur(hzY)}`:""))+
+    (hzY?kpi("Ohne Hochzeit",eur(ohne),`Ø ${eur(ohne/MD.length)} pro Monat – der „normale“ Alltag`):"")+
+    (hasPrev?kpi(`Gegenüber ${vy}`,(ohne-ohneV>=0?"+":"−")+eur(Math.abs(ohne-ohneV)),`gleicher Zeitraum ${vy}: ${eur(ohneV)}${hzY||hzV?" (beides ohne Hochzeit)":""}`,ohne>ohneV?"neg":"pos"):"")+
+    kpi("Fixkosten",eur(S("fix")),`${num(S("fix")/tot*100,0)} % der Ausgaben`)+kpi("Variabel (Splitwise)",eur(S("alltag")+S("hobby")+S("anlass")),`Alltag ${eur(S("alltag"))} · Hobby ${eur(S("hobby"))} · Urlaub & Anlässe ${eur(S("anlass"))}`)+
+    kpi("Auto (Laden + Sonstiges)",eur(S("laden")+S("auto")),"")+(person!=="claudia"&&kE.length?kpi("Andres Einnahmen",eur(kEsum),`laut Konto, ${kE.length} Monate (ohne Familie)`):"");
+  $("#legJahr").innerHTML=RBS.map(([x,n,c])=>`<span><i style="background:var(${c})"></i>${n}</span>`).join("")+(hasPrev?`<span><i style="background:var(--text-3)"></i>Summe ${vy}</span>`:"");
+  mkChart("cJahr",{type:"bar",data:{labels:MD.map(monthShort),datasets:[...RBS.map(([x,n,c])=>({label:n,data:rows.map(r=>r[x]),backgroundColor:css(c),stack:"a",borderColor:css("--surface"),borderWidth:{top:1}})),
+    ...(hasPrev?[{type:"line",label:`Summe ${vy}`,data:prev,borderColor:css("--text-3"),borderDash:[5,4],pointRadius:2,stack:"v"}]:[])]},
+    options:baseOpts({scales:{x:{grid:{display:false},ticks:{color:css("--text-2")},stacked:true},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)},stacked:true}}})});
+  // Kategorien: Fixkosten-Kategorien + Splitwise-Kategorien + Laden
+  const kat={};MD.forEach(k=>{fixAktiv(k).forEach(({p,per})=>{kat["Fix: "+p.kategorie]=(kat["Fix: "+p.kategorie]||0)+share(per.andre,per.claudi)});
+    kat["Laden"]=(kat["Laden"]||0)+ladenPerson(ladenMonat(k));
+    varRows().filter(x=>ym(x.datum)===k).forEach(x=>{const n=x.kategorie||"Sonstiges";kat[n]=(kat[n]||0)+share(x.anteil_andre,x.anteil_claudia)})});
+  const ent=Object.entries(kat).filter(([,v])=>v>1).sort((a,b)=>b[1]-a[1]).slice(0,14);
+  $("#jHintKat").textContent="Top 14 · „Fix:“ = Kategorie der Fixkosten, sonst Splitwise-Kategorie";
+  mkChart("cJahrKat",{type:"bar",data:{labels:ent.map(e=>e[0]),datasets:[{label:"Betrag",data:ent.map(e=>e[1]),backgroundColor:ent.map(e=>e[0].startsWith("Fix:")?css("--s1"):e[0]==="Laden"?css("--s3"):css("--s2")),borderRadius:4,barThickness:14}]},
+    options:baseOpts({indexAxis:"y",scales:{x:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}},y:{grid:{display:false},ticks:{color:css("--text"),autoSkip:false}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>" "+eur(c.parsed.x,2)}}}})});
+  const top=varRows().filter(x=>x.datum.startsWith(y)).map(x=>({...x,a:share(x.anteil_andre,x.anteil_claudia)})).filter(x=>x.a>0).sort((a,b)=>b.a-a.a).slice(0,10);
+  $("#tJahrTop").innerHTML=`<thead><tr><th>Ausgabe</th><th class="n">Betrag</th></tr></thead><tbody>`+top.map(x=>`<tr><td>${x.beschreibung}<span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · ${x.gruppe}</span></td><td class="n">${eur(x.a,2)}</td></tr>`).join("")+"</tbody>";labelTable($("#tJahrTop"));
+  const ch=fixPosten().flatMap(p=>perioden(p).map((q,i,a)=>({p,q,vor:a[i-1]}))).filter(({q,vor})=>q.ab.startsWith(y)&&(vor||q.ab>`${y}-01-01`))
+    .concat(fixPosten().flatMap(p=>perioden(p).filter(q=>q.bis&&q.bis.startsWith(y)&&q===perioden(p).at(-1)).map(q=>({p,q,ende:true}))));
+  $("#tJahrFix").innerHTML=`<thead><tr><th>Posten</th><th class="n">vorher</th><th class="n">neu</th></tr></thead><tbody>`+(ch.length?ch.sort((a,b)=>(a.ende?a.q.bis:a.q.ab)<(b.ende?b.q.bis:b.q.ab)?-1:1).map(({p,q,vor,ende})=>
+    `<tr><td>${p.posten}<span class="sub2">${ende?"beendet "+new Date(q.bis).toLocaleDateString("de-DE"):(vor?"geändert ab ":"neu ab ")+new Date(q.ab).toLocaleDateString("de-DE")} · ${p.kategorie}</span></td><td class="n">${ende?eur(q.gesamt,2):vor?eur(vor.gesamt,2):"–"}</td><td class="n ${ende?"pos":""}">${ende?"–":eur(q.gesamt,2)}</td></tr>`).join(""):`<tr><td colspan="3">Keine Änderungen erfasst.</td></tr>`)+"</tbody>";labelTable($("#tJahrFix"));
+  const kr=(D.konto_andre?.buchungen||[]).filter(x=>x.datum.startsWith(y));
+  if(kr.length&&person!=="claudia"){const g=b=>kr.filter(x=>kBer(x)===b).reduce((s,x)=>s+x.betrag,0);const kat2={};kr.filter(x=>x.bereich==="Ausgabe"&&!x.splitwise).forEach(x=>{const k=x.kategorie.replace(" (Erstattung)","");kat2[k]=(kat2[k]||0)-x.betrag});
+    const e2=Object.entries(kat2).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    $("#tJahrKonto").innerHTML=`<thead><tr><th>Posten</th><th class="n">Betrag</th></tr></thead><tbody>`+
+      [["Einnahmen",g("Einnahme")],["Fixkosten & Kredite",-g("Fixkosten")],["Laden",-g("Laden")],["In Splitwise geteilt",-g("Splitwise")],["Eigene Ausgaben",-g("Ausgabe")]].map(([n,v])=>`<tr class="cat"><td>${n}</td><td class="n">${eur(v)}</td></tr>`).join("")+
+      e2.map(([n,v])=>`<tr><td>${n}</td><td class="n">${eur(v)}</td></tr>`).join("")+"</tbody>";}
+  else $("#tJahrKonto").innerHTML=`<tbody><tr><td>${person==="claudia"?"Nur für Andre.":"Keine Kontoauszüge für dieses Jahr."}</td></tr></tbody>`;
+  labelTable($("#tJahrKonto"));
+  const lr=ladenRows().filter(x=>x.datum.startsWith(y)),kwh=lr.reduce((s,x)=>s+(x.kwh||0),0),le=lr.reduce((s,x)=>s+(x.betrag||0),0),lek=lr.filter(x=>x.kwh>0).reduce((s,x)=>s+(x.betrag||0),0);
+  const kmE=(D.km?.eintraege||[]),kA=[...kmE].reverse().find(x=>x.datum<`${y}-01-01`),kB=[...kmE].reverse().find(x=>x.datum<=`${y}-12-31`),km=kA&&kB?kB.km-kA.km:null;
+  $("#jHintAuto").textContent=`Ladekosten laut Rechnungen (gesamt, nicht nach Anteil)${km?` · km laut Kilometerstand ${kA.km.toLocaleString("de-DE")} → ${kB.km.toLocaleString("de-DE")}`:""}`;
+  $("#kpisJahrAuto").innerHTML=kpi("Ladekosten",eur(le),`${lr.length} Vorgänge`)+kpi("Geladen",num(kwh,0)+" kWh",kwh?`Ø ${num(lek/kwh,3)} €/kWh`:"")+(km?kpi("Gefahren",km.toLocaleString("de-DE")+" km",`${num(le/km*100,2)} € pro 100 km`):"");
+}
+
 /* ---------- Bedienung ---------- */
 $("#qKonto").oninput=()=>tab==="konto"&&rKonto($("#month").value);
 $("#qFix").oninput=()=>tab==="fix"&&rFix($("#month").value);
 $("#qVar").oninput=()=>tab==="variabel"&&rVar($("#month").value);
 $("#month").onchange=render;
 document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{person=b.dataset.p;document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;if(/^\d{4}$/.test($("#month").value)){const y=$("#month").value,opts=[...$("#month").options].map(o=>o.value).filter(v=>v.startsWith(y+"-"));$("#month").value=opts[0]}document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hidden",s.id!=="tab-"+tab));render()});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
 load();
