@@ -372,7 +372,7 @@ function rUeb(m){
 }
 
 function rFix(m){
-  const akt=fixAktiv(m),tot=fixTotal(m),L=last12(m),vm=L[L.length-2],vj=L[0];
+  const akt=fixAktiv(m),tot=fixTotal(m),L=last12(m),vm=L[L.length-2],vj=addM(m,-12);
   const d1=tot-fixTotal(vm),d12=tot-fixTotal(vj);
   const st0=fixStart();const vor=k=>!st0||k<st0;
   const fmtD=(d,k)=>vor(k)?"–":Math.abs(d)<0.005?"unverändert":(d>0?"+":"−")+eur(Math.abs(d),2);
