@@ -145,6 +145,12 @@ dialog select,dialog input,dialog textarea{width:100%}
 
   <section id="tab-uebersicht">
     <div class="kpis" id="kpis"></div>
+    <div class="card full" id="cardUew"><h2>Monatliche Überweisungen von Andre</h2><p class="hint" id="hintUew"></p>
+      <div class="kpis" id="kpisUew" style="margin:0 0 8px"></div>
+      <div class="grid2" style="margin:0">
+        <div><h2 style="font-size:14px">Jährliche Beiträge (Rücklage)</h2><div class="tablewrap"><table id="tRl" class="resp"></table></div></div>
+        <div><h2 style="font-size:14px">Ausgleich mit Claudia</h2><div class="tablewrap"><table id="tAg" class="resp"></table></div></div>
+      </div></div>
     <div class="grid2">
       <div class="card"><h2>Wohin das Geld im Monat geht</h2><p class="hint" id="hintMix"></p><div class="chart"><canvas id="cMix"></canvas></div></div>
       <div class="card"><h2>Variable Autokosten – letzte 12 Monate</h2><p class="hint">Laden laut Rechnungen + sonstige Autokosten laut Splitwise</p>
@@ -271,11 +277,14 @@ dialog select,dialog input,dialog textarea{width:100%}
     <div class="w2 f-daten"><label for="ePosten">Posten</label><input id="ePosten"></div>
     <div class="f-daten"><label for="eKat">Kategorie</label><input id="eKat" list="katList"></div>
     <div class="f-daten"><label for="eAnb">Anbieter</label><input id="eAnb"></div>
-    <div class="f-betrag"><label for="eA">Andre € / Monat</label><input id="eA" inputmode="decimal"></div>
-    <div class="f-betrag"><label for="eC">Claudia € / Monat</label><input id="eC" inputmode="decimal"></div>
-    <div class="f-betrag"><label for="eM">Regine € / Monat <small>(Tilgung)</small></label><input id="eM" inputmode="decimal" placeholder="0"></div>
-    <div class="f-betrag"><label for="eG">Gesamt € / Monat</label><input id="eG" inputmode="decimal" placeholder="leer = Summe der Anteile"></div>
+    <div class="f-daten"><label for="eRh">Zahlweise</label><select id="eRh" onchange="rhSync(true)"><option value="monatlich">monatlich</option><option value="vierteljährlich">vierteljährlich</option><option value="halbjährlich">halbjährlich</option><option value="jährlich">jährlich</option></select></div>
+    <div class="f-daten" id="fFaellig"><label for="eFaellig">Fällig im</label><select id="eFaellig"><option value="">–</option><option value="1">Januar</option><option value="2">Februar</option><option value="3">März</option><option value="4">April</option><option value="5">Mai</option><option value="6">Juni</option><option value="7">Juli</option><option value="8">August</option><option value="9">September</option><option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option></select></div>
+    <div class="f-betrag"><label for="eA"><span>Andre</span> <span class="einh">€ / Monat</span></label><input id="eA" inputmode="decimal"></div>
+    <div class="f-betrag"><label for="eC"><span>Claudia</span> <span class="einh">€ / Monat</span></label><input id="eC" inputmode="decimal"></div>
+    <div class="f-betrag"><label for="eM"><span>Regine</span> <span class="einh">€ / Monat</span> <small>(Tilgung)</small></label><input id="eM" inputmode="decimal" placeholder="0"></div>
+    <div class="f-betrag"><label for="eG"><span>Gesamt</span> <span class="einh">€ / Monat</span></label><input id="eG" inputmode="decimal" placeholder="leer = Summe der Anteile"></div>
     <div class="f-daten"><label for="eWer">Zahlt</label><select id="eWer"><option>Andre</option><option>Claudia</option></select></div>
+    <p class="note w2 hidden" id="rhHint" style="margin:0">Bei jährlicher Zahlweise den <b>Jahresbeitrag</b> eintragen – die App rechnet ihn auf den Monat um (÷ 12) und verteilt ihn auf die Anteile.</p>
     <div class="w2"><label for="eNotiz">Notiz (optional)</label><input id="eNotiz" placeholder="z. B. Preiserhöhung laut Schreiben vom …"></div>
   </div>
   <datalist id="katList"></datalist>
@@ -377,7 +386,7 @@ function baseOpts(extra={}){const t2=css("--text-2"),ln=css("--line");return Obj
   interaction:{mode:"index",intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y??c.parsed.x,2)}`}}},
   scales:{x:{grid:{display:false},ticks:{color:t2},stacked:true},y:{grid:{color:ln},border:{display:false},ticks:{color:t2,callback:v=>eur(v)},stacked:true}}},extra)}
 
-function rUeb(m){
+function rUeb(m){rUew(m);
   const ein=einnahmen(m),fix=fixTotal(m),kEin=andreKontoEin(m),lad=ladenPerson(ladenMonat(m)),auto=swMonat(m,"Ausgabe");
   const vari=D.splitwise_variabel&&!D.splitwise_variabel.error?varMonat(m):0;
   const frei=ein-fix-lad-auto-vari;
@@ -436,7 +445,7 @@ function rFix(m){
   rowsQ.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="8">${p.kategorie}</td></tr>`;last=p.kategorie}
     const seit=per.ab>"1900"?`seit ${new Date(per.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})}`:"";
     const info=kommt?`startet ${new Date(per.ab).toLocaleDateString("de-DE")}`:beendet?`beendet ${new Date(per.bis).toLocaleDateString("de-DE")}`:per.bis?`endet ${new Date(per.bis).toLocaleDateString("de-DE")}`:seit;
-    h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}<span class="sub2">${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}${p.notiz?` · ${p.notiz}`:""}</span></td><td>${p.anbieter||""}</td>
+    h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}${istJahr(p)?` <span class="pill">${rh(p)}</span>`:""}<span class="sub2">${istJahr(p)?`<b>${eur(jahr(per,"gesamt"),2)} im Jahr</b>${faelligTxt(p)?` (fällig ${faelligTxt(p)})`:""} · `:""}${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}${p.notiz?` · ${p.notiz}`:""}</span></td><td>${p.anbieter||""}</td>
       <td class="n">${eur(per.andre,2)}</td><td class="n">${eur(per.claudi,2)}</td><td class="n">${per.mutti?eur(per.mutti,2):""}</td><td class="n">${eur(per.gesamt,2)}</td><td class="n">${eur(bisher(p,m))}</td>
       <td class="n act">${beendet?"":`<button class="btn-s" onclick="openEdit('${p.id}')" aria-label="${p.posten} ändern">✎</button>`}</td></tr>`});
   $("#tFix").innerHTML=h+"</tbody>";labelTable($("#tFix"));
@@ -498,6 +507,14 @@ function rSw(m){
 
 /* ---------- Fixkosten bearbeiten (speichert in data/fixkosten.json im privaten Repo) ---------- */
 let edId=null;
+const MON=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const rh=p=>p.rhythmus||"monatlich",istJahr=p=>rh(p)!=="monatlich";
+const jahr=(per,k)=>per.jahr?.[k]??Math.round((per[k]||0)*1200)/100;
+const faelligTxt=p=>(p.faellig||[]).length?(p.faellig.map(m=>MON[m-1].slice(0,3)).join(" / ")):"";
+function rhSync(umrechnen){const j=eRh.value!=="monatlich",war=eRh.dataset.j==="1";
+  document.querySelectorAll("#dlgEdit .einh").forEach(e=>e.textContent=j?"€ / Jahr":"€ / Monat");$("#fFaellig").classList.toggle("hidden",!j);$("#rhHint").classList.toggle("hidden",!j);
+  if(umrechnen&&j!==war)[eA,eC,eM,eG].forEach(el=>{const v=numIn(el.value);if(v!=null&&!isNaN(v))el.value=String(Math.round((j?v*12:v/12)*100)/100).replace(".",",")});
+  eRh.dataset.j=j?"1":"0"}
 const artRadios=()=>[...document.querySelectorAll('#edArten input')];
 const numIn=v=>{v=String(v||"").trim().replace(/\s|€/g,"");if(!v)return null;v=v.includes(",")?v.replace(/\./g,"").replace(",","."):v;const n=Number(v);return isNaN(n)?NaN:Math.round(n*100)/100};
 const today=()=>new Date().toISOString().slice(0,10);
@@ -515,10 +532,13 @@ function openEdit(id){edId=id;$("#edErr").textContent="";
   if(p){const per=perioden(p).at(-1);$("#edTitle").textContent=p.posten+" ändern";
     $("#edInfo").textContent=`Aktuell ${eur(per.gesamt,2)} im Monat (Andre ${eur(per.andre,2)}, Claudia ${eur(per.claudi,2)}${per.mutti?`, Regine ${eur(per.mutti,2)}`:""})`+(per.ab>"1900"?` seit ${new Date(per.ab).toLocaleDateString("de-DE")}`:"");
     artRadios()[0].checked=true;$("#eDatum").value=per.ab>"1900"?per.ab:"";ePosten.value=p.posten;eKat.value=p.kategorie;eAnb.value=p.anbieter||"";
-    eA.value=String(per.andre).replace(".",",");eC.value=String(per.claudi).replace(".",",");eM.value=per.mutti?String(per.mutti).replace(".",","):"";eG.value=String(per.gesamt).replace(".",",");eWer.value=p.wer_zahlt||"Andre"}
+    const J=istJahr(p),f=k=>String(J?jahr(per,k):per[k]).replace(".",",");
+    eRh.value=rh(p);eRh.dataset.j=J?"1":"0";eFaellig.value=(p.faellig||[])[0]||"";
+    eA.value=f("andre");eC.value=f("claudi");eM.value=per.mutti?f("mutti"):"";eG.value=f("gesamt");eWer.value=(p.wer_zahlt||"Andre").startsWith("Claudi")?"Claudia":"Andre";
+    if(J)$("#edInfo").textContent+=` · Jahresbeitrag ${eur(jahr(per,"gesamt"),2)}${faelligTxt(p)?`, fällig ${faelligTxt(p)}`:""}`}
   else{$("#edTitle").textContent="Neuer Posten";$("#edInfo").textContent="Neu abgeschlossener Vertrag oder neue regelmäßige Zahlung.";
-    $("#eDatum").value=today();ePosten.value="";eKat.value="";eAnb.value="";eA.value="";eC.value="";eM.value="";eG.value="";eWer.value="Andre"}
-  eNotiz.value="";edSync();dlgEdit.showModal()}
+    $("#eDatum").value=today();ePosten.value="";eKat.value="";eAnb.value="";eA.value="";eC.value="";eM.value="";eG.value="";eWer.value="Andre";eRh.value="monatlich";eRh.dataset.j="0";eFaellig.value=""}
+  eNotiz.value="";edSync();rhSync(false);dlgEdit.showModal()}
 
 function applyEdit(data,op){ // wendet die Änderung auf eine frische Kopie der Datei an
   data.version=2;data.posten=data.posten||[];data.aenderungen=data.aenderungen||[];
@@ -527,17 +547,18 @@ function applyEdit(data,op){ // wendet die Änderung auf eine frische Kopie der 
   if(op.art==="neu"){let id=(op.kategorie+"-"+op.posten).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
     while(data.posten.some(p=>p.id===id))id+="-2";
     data.posten.push({id,kategorie:op.kategorie,posten:op.posten,anbieter:op.anbieter||null,wer_zahlt:op.wer,gemeinsam:op.andre>0&&op.claudi>0,
-      perioden:[{ab:op.datum,bis:null,andre:op.andre,claudi:op.claudi,mutti:op.mutti,gesamt:op.gesamt}]});
-    text=`Neuer Posten „${op.posten}“ (${op.kategorie}) ab ${dd(op.datum)}: ${fmt(op.gesamt)}/Monat`;op.id=id}
+      rhythmus:op.rhythmus,faellig:op.faellig,
+      perioden:[{ab:op.datum,bis:null,andre:op.andre,claudi:op.claudi,mutti:op.mutti,gesamt:op.gesamt,...(op.jahr?{jahr:op.jahr}:{})}]});
+    text=`Neuer Posten „${op.posten}“ (${op.kategorie}) ab ${dd(op.datum)}: ${fmt(op.gesamt)}/Monat`+(op.jahr?` (Jahresbeitrag ${fmt(op.jahr.gesamt)})`:"");op.id=id}
   else{const p=data.posten.find(x=>x.id===op.id);if(!p)throw new Error("Posten nicht mehr vorhanden – bitte neu laden.");
     if(!p.perioden)p.perioden=perioden(p);const cur=p.perioden.at(-1);
-    if(op.art==="korrektur"){const alt=`${fmt(cur.gesamt)}`;Object.assign(cur,{andre:op.andre,claudi:op.claudi,mutti:op.mutti,gesamt:op.gesamt});if(op.datum)cur.ab=op.datum;
-      Object.assign(p,{posten:op.posten,kategorie:op.kategorie,anbieter:op.anbieter||null,wer_zahlt:op.wer});
-      text=`Korrektur „${p.posten}“: ${alt} → ${fmt(op.gesamt)}/Monat (Fehleintrag, rückwirkend)`}
+    if(op.art==="korrektur"){const alt=`${fmt(cur.gesamt)}`;Object.assign(cur,{andre:op.andre,claudi:op.claudi,mutti:op.mutti,gesamt:op.gesamt});if(op.jahr)cur.jahr=op.jahr;else delete cur.jahr;if(op.datum)cur.ab=op.datum;
+      Object.assign(p,{posten:op.posten,kategorie:op.kategorie,anbieter:op.anbieter||null,wer_zahlt:op.wer,rhythmus:op.rhythmus,faellig:op.faellig});
+      text=`Korrektur „${p.posten}“: ${alt} → ${fmt(op.gesamt)}/Monat`+(op.jahr?` (Jahresbeitrag ${fmt(op.jahr.gesamt)}, ${op.rhythmus})`:"")+` (Fehleintrag, rückwirkend)`}
     else if(op.art==="aenderung"){if(op.datum<=cur.ab)throw new Error("Das Datum muss nach dem Beginn des bisherigen Betrags liegen – sonst „Fehleintrag korrigieren“ wählen.");
-      const alt=cur.gesamt;cur.bis=dm1(op.datum);p.perioden.push({ab:op.datum,bis:null,andre:op.andre,claudi:op.claudi,mutti:op.mutti,gesamt:op.gesamt});
-      Object.assign(p,{posten:op.posten,kategorie:op.kategorie,anbieter:op.anbieter||null,wer_zahlt:op.wer});
-      text=`Änderung „${p.posten}“ ab ${dd(op.datum)}: ${fmt(alt)} → ${fmt(op.gesamt)}/Monat (${op.gesamt>=alt?"+":"−"}${fmt(Math.abs(op.gesamt-alt))})`}
+      const alt=cur.gesamt;cur.bis=dm1(op.datum);p.perioden.push({ab:op.datum,bis:null,andre:op.andre,claudi:op.claudi,mutti:op.mutti,gesamt:op.gesamt,...(op.jahr?{jahr:op.jahr}:{})});
+      Object.assign(p,{posten:op.posten,kategorie:op.kategorie,anbieter:op.anbieter||null,wer_zahlt:op.wer,rhythmus:op.rhythmus,faellig:op.faellig});
+      text=`Änderung „${p.posten}“ ab ${dd(op.datum)}: ${fmt(alt)} → ${fmt(op.gesamt)}/Monat (${op.gesamt>=alt?"+":"−"}${fmt(Math.abs(op.gesamt-alt))})`+(op.jahr?` · Jahresbeitrag ${fmt(op.jahr.gesamt)}`:"")}
     else{if(op.datum<cur.ab)throw new Error("Das Enddatum liegt vor dem Beginn des Postens.");cur.bis=op.datum;
       text=`Wegfall „${p.posten}“ zum ${dd(op.datum)} (bisher ${fmt(cur.gesamt)}/Monat)`}}
   if(op.notiz)text+=` – ${op.notiz}`;
@@ -561,7 +582,8 @@ async function commitFix(mutator){ // lädt die aktuelle Datei, ändert sie und 
 async function saveEdit(){
   const neu=edId===null,art=neu?"neu":artRadios().find(r=>r.checked).value;
   const op={art,id:edId,datum:$("#eDatum").value,posten:ePosten.value.trim(),kategorie:eKat.value.trim(),anbieter:eAnb.value.trim(),wer:eWer.value,notiz:eNotiz.value.trim(),
-    andre:numIn(eA.value)??0,claudi:numIn(eC.value)??0,mutti:numIn(eM.value)??0};op.gesamt=numIn(eG.value)??Math.round((op.andre+op.claudi+op.mutti)*100)/100;
+    andre:numIn(eA.value)??0,claudi:numIn(eC.value)??0,mutti:numIn(eM.value)??0,rhythmus:eRh.value,faellig:eFaellig.value?[+eFaellig.value]:[]};op.gesamt=numIn(eG.value)??Math.round((op.andre+op.claudi+op.mutti)*100)/100;
+  if(op.rhythmus!=="monatlich"&&![op.andre,op.claudi,op.mutti,op.gesamt].some(isNaN)){op.jahr={andre:op.andre,claudi:op.claudi,mutti:op.mutti,gesamt:op.gesamt};["andre","claudi","mutti","gesamt"].forEach(k=>op[k]=Math.round(op.jahr[k]/12*100)/100)}
   const err=m=>{$("#edErr").textContent=m};
   if(art!=="wegfall"&&[op.andre,op.claudi,op.mutti,op.gesamt].some(isNaN))return err("Bitte Beträge als Zahl eingeben, z. B. 12,99.");
   if((art==="neu"||art==="aenderung"||art==="wegfall")&&!op.datum)return err("Bitte ein Datum angeben.");
@@ -761,6 +783,34 @@ function rBord(){
     kpi("Laut Ladehistorie",`≈ ${num(kwhR+schaetz,0)} kWh`,`${num(kwhR,0)} kWh belegt`+(ohne?` + ≈ ${num(schaetz,0)} kWh geschätzt aus ${ohne} Rechnungen ohne kWh (${eur(eOhne)})`:""))+
     kpi("Abgleich",`≈ ${num((kwhR+schaetz)/netz*100,0)} %`,`der benötigten Energie ist erfasst · Lücke ≈ ${num(Math.max(0,netz-kwhR-schaetz),0)} kWh`,(kwhR+schaetz)/netz>0.9?"pos":"neg")+
     kpi("Energiekosten pro 100 km",num(kosten/b.km*100,2)+" €",`real bezahlt, ohne IONITY-Abo · Ø ${num(preis,2)} €/kWh`);
+}
+
+
+/* ---------- Monatliche Überweisungen (Rücklage + Ausgleich) ---------- */
+const zahltAndre=p=>(p.wer_zahlt||"").startsWith("Andre"),zahltClaudia=p=>(p.wer_zahlt||"").startsWith("Claudi");
+function ruecklage(m){return fixAktiv(m).filter(({p})=>istJahr(p)&&zahltAndre(p))}
+function ausgleich(m){const a=fixAktiv(m);
+  const fuerClaudia=a.filter(({p,per})=>zahltAndre(p)&&per.claudi>0),fuerAndre=a.filter(({p,per})=>zahltClaudia(p)&&per.andre>0);
+  const sC=fuerClaudia.reduce((s,x)=>s+x.per.claudi,0),sA=fuerAndre.reduce((s,x)=>s+x.per.andre,0);return {fuerClaudia,fuerAndre,sC,sA,netto:sA-sC}}
+function kontoIst(m,f){const r=(D.konto_andre?.buchungen||[]).filter(x=>ym(x.datum)===m&&f(x));return r.length?-r.reduce((s,x)=>s+x.betrag,0):null}
+function rUew(m){
+  const rl=ruecklage(m),rlS=rl.reduce((s,x)=>s+x.per.gesamt,0),ag=ausgleich(m);
+  const zeigKonto=person!=="claudia"&&(D.konto_andre?.buchungen||[]).length;
+  const kMon=zeigKonto?(kontoIst(m,x=>x.kategorie==="Rücklage Jahresbeiträge")!=null?m:[...new Set(D.konto_andre.buchungen.map(x=>ym(x.datum)))].filter(k=>k<=m).at(-1)):null;
+  const istRl=kMon?kontoIst(kMon,x=>x.kategorie==="Rücklage Jahresbeiträge"):null,istAg=kMon?kontoIst(kMon,x=>x.kategorie==="Ausgleich mit Claudia"&&/monatlich/i.test(x.zweck||"")):null;
+  const diff=(ist,soll)=>ist==null?"":Math.abs(ist-soll)<0.5?" · passt":` · ${ist>soll?"zu viel":"zu wenig"}: ${eur(Math.abs(ist-soll),2)}`;
+  $("#hintUew").textContent=`Soll für ${monthName(m)} aus den Fixkosten`+(kMon?` · Ist laut Kontoauszug ${monthName(kMon)}`:"");
+  $("#kpisUew").innerHTML=kpi("Aufs Rücklagekonto",eur(rlS,2),`für ${rl.length} jährliche Beiträge (${eur(rlS*12)} im Jahr)`+(istRl!=null?` · überwiesen ${eur(istRl,2)}${diff(istRl,rlS)}`:""),istRl==null||Math.abs(istRl-rlS)<0.5?"":"neg")+
+    kpi(ag.netto>=0?"An Claudia (Ausgleich)":"Claudia an dich (Ausgleich)",eur(Math.abs(ag.netto),2),`du trägst ${eur(ag.sA,2)} ihrer Zahlungen, sie ${eur(ag.sC,2)} deiner`+(istAg!=null?` · überwiesen ${eur(istAg,2)}${diff(istAg,ag.netto)}`:""),istAg==null||Math.abs(istAg-ag.netto)<0.5?"":"neg")+
+    kpi("Zusammen",eur(rlS+Math.max(0,ag.netto),2),"Daueraufträge am Monatsanfang");
+  $("#tRl").innerHTML=`<thead><tr><th>Posten</th><th class="n">Jahr</th><th class="n">Monat</th></tr></thead><tbody>`+
+    rl.sort((a,b)=>b.per.gesamt-a.per.gesamt).map(({p,per})=>`<tr><td>${p.posten}<span class="sub2">${p.kategorie} · ${rh(p)}${faelligTxt(p)?`, fällig ${faelligTxt(p)}`:""}${per.claudi>0?` · Claudias Anteil ${eur(jahr(per,"claudi"),2)}/Jahr`:""}</span></td><td class="n">${eur(jahr(per,"gesamt"),2)}</td><td class="n">${eur(per.gesamt,2)}</td></tr>`).join("")+
+    `<tr class="cat"><td>Summe</td><td class="n">${eur(rl.reduce((s,x)=>s+jahr(x.per,"gesamt"),0),2)}</td><td class="n">${eur(rlS,2)}</td></tr></tbody>`;labelTable($("#tRl"));
+  const zeile=({p,per},k)=>`<tr><td>${p.posten}<span class="sub2">${p.kategorie}${istJahr(p)?` · ${rh(p)}`:""}</span></td><td class="n">${eur(per[k],2)}</td></tr>`;
+  $("#tAg").innerHTML=`<thead><tr><th>Posten</th><th class="n">Anteil / Monat</th></tr></thead><tbody>`+
+    `<tr class="cat"><td>Claudia zahlt – dein Anteil</td><td class="n">${eur(ag.sA,2)}</td></tr>`+ag.fuerAndre.map(x=>zeile(x,"andre")).join("")+
+    `<tr class="cat"><td>Du zahlst – Claudias Anteil</td><td class="n">−${eur(ag.sC,2)}</td></tr>`+ag.fuerClaudia.map(x=>zeile(x,"claudi")).join("")+
+    `<tr class="cat"><td>${ag.netto>=0?"Du überweist an Claudia":"Claudia überweist dir"}</td><td class="n">${eur(Math.abs(ag.netto),2)}</td></tr></tbody>`;labelTable($("#tAg"));
 }
 
 /* ---------- Jahresrückblick ---------- */
