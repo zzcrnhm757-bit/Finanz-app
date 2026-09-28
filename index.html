@@ -46,7 +46,15 @@ nav button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--acc
 main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
-.kpi .label{color:var(--text-2);font-size:13px}
+.kpi .label{color:var(--text-2);font-size:13px;display:flex;justify-content:space-between;gap:6px}
+.kpi.go{cursor:pointer;transition:border-color .15s,box-shadow .15s}.kpi.go:hover,.kpi.go:focus-visible{border-color:var(--s1);outline:none;box-shadow:0 0 0 1px var(--s1)}
+.kpi.go.open{border-color:var(--s1)}.kpi.go.open .goi{transform:rotate(180deg)}.goi{color:var(--text-3);font-size:14px;line-height:1;transition:transform .15s}
+.donut{display:grid;grid-template-columns:minmax(0,220px) 1fr;gap:16px;align-items:center}.donut .chart{height:220px}
+.dleg{list-style:none;margin:0;padding:0;font-size:13.5px}.dleg li{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
+.dleg i{width:10px;height:10px;border-radius:3px}.dleg .n{font-variant-numeric:tabular-nums;text-align:right}.dleg .p{color:var(--text-3);min-width:38px}
+@media (max-width:560px){.donut{grid-template-columns:1fr}.donut .chart{height:200px;max-width:220px;margin:0 auto}}
+.swipehint{display:none}
+@media (max-width:560px){.kpis{grid-template-columns:1fr 1fr;gap:8px}.kpi{padding:12px}.kpi .value{font-size:19px}.kpi .sub{font-size:11.5px}.kpi .label{font-size:12px}}
 .kpi .value{font-size:28px;font-weight:650;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
 .kpi .sub{color:var(--text-3);font-size:12.5px;margin-top:2px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
@@ -147,10 +155,9 @@ dialog select,dialog input,dialog textarea{width:100%}
     <div class="kpis" id="kpis"></div>
     <div class="card full" id="cardUew"><h2>Monatliche Überweisungen von Andre</h2><p class="hint" id="hintUew"></p>
       <div class="kpis" id="kpisUew" style="margin:0 0 8px"></div>
-      <div class="grid2" style="margin:0">
-        <div><h2 style="font-size:14px">Jährliche Beiträge (Rücklage)</h2><div class="tablewrap"><table id="tRl" class="resp"></table></div></div>
-        <div><h2 style="font-size:14px">Ausgleich mit Claudia</h2><div class="tablewrap"><table id="tAg" class="resp"></table></div></div>
-      </div></div>
+      <div id="boxRl" class="hidden"><h2 style="font-size:14px">Jährliche Beiträge (Rücklage)</h2><div class="tablewrap"><table id="tRl" class="resp"></table></div></div>
+      <div id="boxAg" class="hidden"><h2 style="font-size:14px">Ausgleich mit Claudia</h2><div class="tablewrap"><table id="tAg" class="resp"></table></div></div>
+    </div>
     <div class="grid2">
       <div class="card"><h2>Wohin das Geld im Monat geht</h2><p class="hint" id="hintMix"></p><div class="chart"><canvas id="cMix"></canvas></div></div>
       <div class="card"><h2>Variable Autokosten – letzte 12 Monate</h2><p class="hint">Laden laut Rechnungen + sonstige Autokosten laut Splitwise</p>
@@ -174,7 +181,7 @@ dialog select,dialog input,dialog textarea{width:100%}
     <div class="kpis" id="kpisFix"></div>
     <div class="grid2">
       <div class="card"><h2>Entwicklung der Fixkosten</h2><p class="hint" id="hintFixVerlauf"></p><div class="chart"><canvas id="cFixVerlauf"></canvas></div></div>
-      <div class="card"><h2>Fixkosten nach Kategorie</h2><p class="hint" id="hintFix"></p><div class="chart" style="height:340px"><canvas id="cFix"></canvas></div></div>
+      <div class="card"><h2>Fixkosten nach Kategorie</h2><p class="hint" id="hintFix"></p><div class="donut"><div class="chart"><canvas id="cFix"></canvas></div><ul class="dleg" id="legFix"></ul></div></div>
     </div>
     <div class="card full"><div class="toolbar"><h2>Alle Posten</h2><button class="primary btn-s" onclick="openEdit(null)">+ Neuer Posten</button></div>
       <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
@@ -375,7 +382,7 @@ function init(){
   $("#stand").textContent="Datenstand – "+st.join(" · ");
   render();
 }
-function kpi(label,value,sub,cls=""){return `<div class="card kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`}
+function kpi(label,value,sub,cls="",go=""){return `<div class="card kpi${go?" go":""}"${go?` data-go="${go}" role="button" tabindex="0"`:""}><div class="label">${label}${go?`<span class="goi" aria-hidden="true">${go.startsWith("#")?"▾":"›"}</span>`:""}</div><div class="value ${cls}">${value}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`}
 function render(){const m=$("#month").value;if(!m)return;
   const isY=/^\d{4}$/.test(m);document.querySelectorAll("main section").forEach(x=>x.classList.toggle("hidden",isY?x.id!=="tab-jahr":x.id!=="tab-"+tab));
   document.querySelector("nav").classList.toggle("dim",isY);if(isY)return rJahr(m);
@@ -391,12 +398,12 @@ function rUeb(m){rUew(m);
   const vari=D.splitwise_variabel&&!D.splitwise_variabel.error?varMonat(m):0;
   const frei=ein-fix-lad-auto-vari;
   const who=person==="alle"?"Andre + Claudia":person==="andre"?"Andre":"Claudia";
-  $("#kpis").innerHTML=kpi("Einnahmen (netto)",eur(ein),who+(person==="claudia"?" · laut Kostentabelle":kEin!=null?" · Andre laut Konto (Gehalt, Miete u. a.)":" · Andre laut Kostentabelle (noch kein Kontoauszug)"))+
-    kpi("Fixkosten",eur(fix),`${fixAktiv(m).length} aktive Posten`+(person==="alle"?"":" · dein Anteil"))+
-    kpi("Laden",eur(lad),person==="alle"?`${monthName(m)} · laut Rechnungen`:`Anteil ${Math.round((person==="andre"?ladenQuote():1-ladenQuote())*100)} % laut Splitwise`)+
-    kpi("Sonstiges Auto",eur(auto),"Splitwise ohne Laden & Ausgleich")+
-    kpi("Variable Kosten",eur(vari),"Splitwise: Alltag, Hobby, Urlaub")+
-    kpi("Frei verfügbar",eur(frei),"Einnahmen − alle Kosten",frei>=0?"pos":"neg");
+  $("#kpis").innerHTML=kpi("Einnahmen (netto)",eur(ein),who+(person==="claudia"?" · laut Kostentabelle":kEin!=null?" · Andre laut Konto (Gehalt, Miete u. a.)":" · Andre laut Kostentabelle (noch kein Kontoauszug)"),"",person==="claudia"?"":"konto")+
+    kpi("Fixkosten",eur(fix),`${fixAktiv(m).length} aktive Posten`+(person==="alle"?"":" · dein Anteil"),"","fix")+
+    kpi("Laden",eur(lad),person==="alle"?`${monthName(m)} · laut Rechnungen`:`Anteil ${Math.round((person==="andre"?ladenQuote():1-ladenQuote())*100)} % laut Splitwise`,"","laden")+
+    kpi("Sonstiges Auto",eur(auto),"Splitwise ohne Laden & Ausgleich","","splitwise")+
+    kpi("Variable Kosten",eur(vari),"Splitwise: Alltag, Hobby, Urlaub","","variabel")+
+    kpi("Frei verfügbar",eur(frei),"Einnahmen − alle Kosten",frei>=0?"pos":"neg","rueckblick");
   // Aufteilung als horizontale Balken (Kategorie-Summen)
   const kat={};fixAktiv(m).forEach(({p,per})=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(per.andre,per.claudi));
   kat["Laden"]=(kat["Laden"]||0)+lad;kat["Sonstiges Auto"]=auto;
@@ -428,11 +435,15 @@ function rFix(m){
   // Kategorien
   const kat={};akt.forEach(({p,per})=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(per.andre,per.claudi));
   const ent=Object.entries(kat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  $("#cFix").parentElement.style.height=Math.max(240,ent.length*30+50)+"px";
-  $("#hintFix").textContent=`${eur(tot)} pro Monat · ${eur(tot*12)} im Jahr`;
-  mkChart("cFix",{type:"bar",data:{labels:ent.map(e=>e[0]),datasets:[{label:"Monatlich",data:ent.map(e=>e[1]),backgroundColor:css("--s1"),borderRadius:4,barThickness:18}]},
-    options:baseOpts({indexAxis:"y",scales:{x:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}},y:{grid:{display:false},ticks:{color:css("--text"),autoSkip:false}}},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>" "+eur(c.parsed.x,2)}}}})});
+  $("#hintFix").textContent=`${eur(tot)} pro Monat · ${eur(tot*12)} im Jahr · Kategorie antippen filtert die Liste`;
+  const COLS=["--s1","--s2","--s3","--s4","--s5","--s7","--s8","--s6"],MAXK=7;
+  const ent2=ent.length>MAXK+1?[...ent.slice(0,MAXK),["Übrige",ent.slice(MAXK).reduce((x,e)=>x+e[1],0)]]:ent;
+  const col=ent2.map((e,i)=>e[0]==="Übrige"?css("--text-3"):css(COLS[i%COLS.length])),sum=ent2.reduce((x,e)=>x+e[1],0);
+  mkChart("cFix",{type:"doughnut",data:{labels:ent2.map(e=>e[0]),datasets:[{data:ent2.map(e=>e[1]),backgroundColor:col,borderColor:css("--surface"),borderWidth:2,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"62%",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${eur(c.parsed,2)} (${num(c.parsed/sum*100,0)} %)`}}},
+      onClick:(e,el)=>{if(el.length){const k=ent2[el[0].index][0];if(k!=="Übrige"){$("#qFix").value=k;rFix($("#month").value);$("#tFix").scrollIntoView({behavior:"smooth"})}}}}});
+  $("#legFix").innerHTML=ent2.map((e,i)=>`<li data-k="${e[0]}" style="cursor:${e[0]==="Übrige"?"default":"pointer"}"><i style="background:${col[i]}"></i><span>${e[0]}</span><span class="n">${eur(e[1],0)}</span><span class="n p">${num(e[1]/sum*100,0)} %</span></li>`).join("");
+  $("#legFix").querySelectorAll("li").forEach(li=>li.onclick=()=>{const k=li.dataset.k;if(k==="Übrige")return;$("#qFix").value=$("#qFix").value===k?"":k;rFix($("#month").value);$("#tFix").scrollIntoView({behavior:"smooth"})});
   // Tabelle: aktive Posten + im Monat oder früher beendete
   const rows=fixPosten().map(p=>{const per=periodeIn(p,m);const ps=perioden(p);const lastP=ps[ps.length-1];
     const beendet=!per&&lastP.bis&&lastP.bis<m+"-01";const kommt=!per&&!beendet;return {p,per:per||ps.find(x=>x.ab>mEnd(m))||lastP,beendet,kommt}})
@@ -801,13 +812,13 @@ function dauerauftrag(art,m){ // Betrag für Monat m: Kontoauszug, sonst vereinb
   if(v&&(!b||v.ab>=b.datum.slice(0,8)+"01"))return {betrag:v.betrag,quelle:`Dauerauftrag seit ${new Date(v.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})}`,notiz:v.notiz};
   if(b&&person!=="claudia")return {betrag:-b.betrag,quelle:`zuletzt überwiesen ${new Date(b.datum).toLocaleDateString("de-DE")}`};
   return null}
-function rUew(m){
+function rUew(m){setTimeout(syncOpen);
   const rl=ruecklage(m),rlS=rl.reduce((s,x)=>s+x.per.gesamt,0),ag=ausgleich(m);
   const dR=dauerauftrag("ruecklage",m),dA=dauerauftrag("ausgleich_claudia",m);
   const chk=(ist,soll)=>Math.abs(ist-soll)<0.5?"passt zu den Fixkosten":`Fixkosten ergeben ${eur(soll,2)} (${ist>soll?"+":"−"}${eur(Math.abs(ist-soll),2)})`;
-  $("#hintUew").textContent=`${monthName(m)} · was du monatlich überweist und was die Fixkosten dafür ergeben`;
-  $("#kpisUew").innerHTML=kpi("Aufs Rücklagekonto",eur(dR?dR.betrag:rlS,2),dR?`${dR.quelle} · ${chk(dR.betrag,rlS)}`:`laut Fixkosten (${rl.length} jährliche Beiträge)`,dR&&Math.abs(dR.betrag-rlS)>=0.5?"neg":"")+
-    kpi("An Claudia (Ausgleich)",eur(dA?dA.betrag:ag.netto,2),dA?`${dA.quelle} · ${chk(dA.betrag,ag.netto)}`:"laut Fixkosten",dA&&Math.abs(dA.betrag-ag.netto)>=0.5?"neg":"")+
+  $("#hintUew").textContent=`${monthName(m)} · was du monatlich überweist · auf einen Betrag tippen für die Aufstellung`;
+  $("#kpisUew").innerHTML=kpi("Aufs Rücklagekonto",eur(dR?dR.betrag:rlS,2),dR?`${dR.quelle} · ${chk(dR.betrag,rlS)}`:`laut Fixkosten (${rl.length} jährliche Beiträge)`,dR&&Math.abs(dR.betrag-rlS)>=0.5?"neg":"","#boxRl")+
+    kpi("An Claudia (Ausgleich)",eur(dA?dA.betrag:ag.netto,2),dA?`${dA.quelle} · ${chk(dA.betrag,ag.netto)}`:"laut Fixkosten",dA&&Math.abs(dA.betrag-ag.netto)>=0.5?"neg":"","#boxAg")+
     kpi("Zusammen",eur((dR?dR.betrag:rlS)+(dA?dA.betrag:ag.netto),2),"Daueraufträge am Monatsanfang")+
     (person!=="claudia"?`<div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s" onclick="openUew('ruecklage')">Rücklage-Betrag ändern ✎</button><button class="btn-s" onclick="openUew('ausgleich_claudia')">Ausgleich-Betrag ändern ✎</button></div>`:"");
   $("#tRl").innerHTML=`<thead><tr><th>Posten</th><th class="n">Jahr</th><th class="n">Monat</th></tr></thead><tbody>`+
@@ -879,6 +890,21 @@ function rJahr(y){
   $("#jHintAuto").textContent=`Ladekosten laut Rechnungen (gesamt, nicht nach Anteil)${km?` · km laut Kilometerstand ${kA.km.toLocaleString("de-DE")} → ${kB.km.toLocaleString("de-DE")}`:""}`;
   $("#kpisJahrAuto").innerHTML=kpi("Ladekosten",eur(le),`${lr.length} Vorgänge`)+kpi("Geladen",num(kwh,0)+" kWh",kwh?`Ø ${num(lek/kwh,3)} €/kWh`:"")+(km?kpi("Gefahren",km.toLocaleString("de-DE")+" km",`${num(le/km*100,2)} € pro 100 km`):"");
 }
+
+
+/* ---------- Bedienung: Karten antippen, Wischen ---------- */
+const offen=new Set();
+function syncOpen(){document.querySelectorAll('.kpi[data-go^="#"]').forEach(k=>{const id=k.dataset.go,o=offen.has(id);k.classList.toggle("open",o);k.setAttribute("aria-expanded",o);$(id)?.classList.toggle("hidden",!o)})}
+function goTab(t){const b=document.querySelector(`nav button[data-tab="${t}"]`);if(!b)return;b.click();b.scrollIntoView({block:"nearest",inline:"center"});window.scrollTo({top:0,behavior:"smooth"})}
+function kpiGo(el){const g=el.dataset.go;if(g.startsWith("#")){offen.has(g)?offen.delete(g):offen.add(g);syncOpen();if(offen.has(g))$(g).scrollIntoView({behavior:"smooth",block:"nearest"})}else goTab(g)}
+document.addEventListener("click",e=>{const k=e.target.closest(".kpi[data-go]");if(k)kpiGo(k)});
+document.addEventListener("keydown",e=>{const k=e.target.closest?.(".kpi[data-go]");if(k&&(e.key==="Enter"||e.key===" ")){e.preventDefault();kpiGo(k)}});
+(()=>{let x0=null,y0=null,t0=0;const main=document.querySelector("main");
+  main.addEventListener("touchstart",e=>{if(e.touches.length!==1||e.target.closest("input,select,textarea,canvas,.tablewrap,dialog")){x0=null;return}x0=e.touches[0].clientX;y0=e.touches[0].clientY;t0=Date.now()},{passive:true});
+  main.addEventListener("touchend",e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;x0=null;
+    if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*0.6||Date.now()-t0>800||/^\d{4}$/.test($("#month").value))return;
+    const bs=[...document.querySelectorAll("nav button")].filter(b=>b.offsetParent!==null),i=bs.findIndex(b=>b.dataset.tab===tab),n=bs[i+(dx<0?1:-1)];
+    if(n){main.animate([{opacity:.35,transform:`translateX(${dx<0?24:-24}px)`},{opacity:1,transform:"none"}],{duration:180,easing:"ease-out"});goTab(n.dataset.tab)}},{passive:true})})();
 
 /* ---------- Bedienung ---------- */
 $("#qKonto").oninput=()=>tab==="konto"&&rKonto($("#month").value);
