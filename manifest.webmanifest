@@ -1,0 +1,10 @@
+{
+ "name": "Haushalt Andre & Claudia",
+ "short_name": "Haushalt",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "background_color": "#f4f3ef",
+ "theme_color": "#fcfcfb",
+ "icons": [{"src": "icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any"}]
+}

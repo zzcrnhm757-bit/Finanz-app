@@ -2,11 +2,16 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Haushalt Andre & Claudia</title>
 <meta name="robots" content="noindex">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Haushalt">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
 
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M8 22V14l8-6 8 6v8h-5v-5h-6v5z' fill='white'/></svg>">
@@ -30,7 +35,7 @@
   --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-header{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
 .bar{max-width:1180px;margin:0 auto;padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 h1{font-size:18px;margin:0 auto 0 0;font-weight:650;letter-spacing:-.01em}
 select,button,input{font:inherit;color:inherit}
@@ -54,6 +59,15 @@ main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
 .dleg i{width:10px;height:10px;border-radius:3px}.dleg .n{font-variant-numeric:tabular-nums;text-align:right}.dleg .p{color:var(--text-3);min-width:38px}
 @media (max-width:560px){.donut{grid-template-columns:1fr}.donut .chart{height:200px;max-width:220px;margin:0 auto}}
 .swipehint{display:none}
+@media (max-width:560px){nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}nav::-webkit-scrollbar{display:none}nav button{white-space:nowrap;flex:0 0 auto}.bar{padding:10px 16px;gap:8px}}
+.dots{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--text-3);width:100%}.dots span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.dots i{width:8px;height:8px;border-radius:50%;display:inline-block}.dots i.ok{background:var(--good,#1baf7a)}.dots i.alt{background:var(--s4)}.dots i.rot{background:var(--s8)}
+@media (min-width:900px){.dots{width:auto;margin-left:auto;order:-1}}
+.budget{display:grid;gap:10px}.budget .row{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;font-size:13.5px}
+.budget .bar2{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;position:relative}.budget .bar2 b{display:block;height:100%;border-radius:99px}
+.budget .n{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.faellig{list-style:none;margin:6px 0 0;padding:0;font-size:13.5px}.faellig li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.ruhend td{color:var(--text-3)}
 @media (max-width:560px){.kpis{grid-template-columns:1fr 1fr;gap:8px}.kpi{padding:12px}.kpi .value{font-size:19px}.kpi .sub{font-size:11.5px}.kpi .label{font-size:12px}}
 .kpi .value{font-size:28px;font-weight:650;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
 .kpi .sub{color:var(--text-3);font-size:12.5px;margin-top:2px}
@@ -130,6 +144,7 @@ dialog select,dialog input,dialog textarea{width:100%}
       <button data-p="claudia" aria-pressed="false">Claudia</button>
     </div>
     <button id="btnSettings" title="Datenquelle">⚙︎</button>
+    <div class="dots" id="dots" aria-label="Datenstand"></div>
   </div>
   <nav role="tablist">
     <button role="tab" data-tab="uebersicht" aria-selected="true">Übersicht</button>
@@ -138,7 +153,6 @@ dialog select,dialog input,dialog textarea{width:100%}
     <button role="tab" data-tab="mutti" aria-selected="false">Darlehen Regine</button>
     <button role="tab" data-tab="variabel" aria-selected="false">Variabel</button>
     <button role="tab" data-tab="laden" aria-selected="false">Auto &amp; Laden</button>
-    <button role="tab" data-tab="splitwise" aria-selected="false">Splitwise</button>
     <button role="tab" data-tab="konto" aria-selected="false">Andres Konto</button>
   </nav>
 </header>
@@ -155,6 +169,7 @@ dialog select,dialog input,dialog textarea{width:100%}
     <div class="kpis" id="kpis"></div>
     <div class="card full" id="cardUew"><h2>Monatliche Überweisungen von Andre</h2><p class="hint" id="hintUew"></p>
       <div class="kpis" id="kpisUew" style="margin:0 0 8px"></div>
+      <div id="boxFl" class="hidden"></div>
       <div id="boxRl" class="hidden"><h2 style="font-size:14px">Jährliche Beiträge (Rücklage)</h2><div class="tablewrap"><table id="tRl" class="resp"></table></div></div>
       <div id="boxAg" class="hidden"><h2 style="font-size:14px">Ausgleich mit Claudia</h2><div class="tablewrap"><table id="tAg" class="resp"></table></div></div>
     </div>
@@ -183,7 +198,7 @@ dialog select,dialog input,dialog textarea{width:100%}
       <div class="card"><h2>Entwicklung der Fixkosten</h2><p class="hint" id="hintFixVerlauf"></p><div class="chart"><canvas id="cFixVerlauf"></canvas></div></div>
       <div class="card"><h2>Fixkosten nach Kategorie</h2><p class="hint" id="hintFix"></p><div class="donut"><div class="chart"><canvas id="cFix"></canvas></div><ul class="dleg" id="legFix"></ul></div></div>
     </div>
-    <div class="card full"><div class="toolbar"><h2>Alle Posten</h2><button class="primary btn-s" onclick="openEdit(null)">+ Neuer Posten</button></div>
+    <div class="card full"><div class="toolbar"><h2>Alle Posten</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s" id="btnRuhend" onclick="zeigRuhend=!zeigRuhend;rFix($('#month').value)"></button><button class="primary btn-s" onclick="openEdit(null)">+ Neuer Posten</button></div></div>
       <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
       <input type="search" id="qFix" placeholder="Posten suchen (Name, Anbieter, Kategorie)" style="width:100%;margin-bottom:8px">
       <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
@@ -220,6 +235,7 @@ dialog select,dialog input,dialog textarea{width:100%}
 
   <section id="tab-variabel" class="hidden">
     <div class="kpis" id="kpisVar"></div>
+    <div class="card full" id="cardBudget" style="margin-bottom:12px"><div class="toolbar"><h2>Budget im Monat</h2><button class="btn-s" onclick="openBudget()">Budget ändern ✎</button></div><p class="hint" id="hintBudget"></p><div class="budget" id="budget"></div></div>
     <div class="grid2">
       <div class="card"><h2>Variable Kosten – letzte 12 Monate</h2><p class="hint">Gemeinsame Ausgaben laut Splitwise, ohne Ausgleichszahlungen</p><div class="legend" id="legVar"></div><div class="chart"><canvas id="cVar"></canvas></div></div>
       <div class="card"><h2>Wofür im Monat</h2><p class="hint" id="hintVarKat"></p><div class="chart"><canvas id="cVarKat"></canvas></div></div>
@@ -237,6 +253,9 @@ dialog select,dialog input,dialog textarea{width:100%}
       <div class="card"><h2>Preis pro kWh</h2><p class="hint">Durchschnitt je Anbieter, letzte 12 Monate</p><div class="tablewrap"><table id="tAnb" class="resp"></table></div></div>
     </div>
     <div class="card" style="margin-top:12px"><h2>Ladevorgänge im Monat</h2><div class="tablewrap"><table id="tLaden" class="resp"></table></div></div>
+    <h2 style="margin:22px 0 10px;font-size:17px">Sonstige Autokosten (Splitwise „Kosten Xer“)</h2>
+    <div class="kpis" id="kpisSw"></div>
+    <div class="card"><h2>Einträge im Monat</h2><p class="hint" id="hintSw"></p><div class="tablewrap"><table id="tSw" class="resp"></table></div></div>
   </section>
 
   <section id="tab-konto" class="hidden">
@@ -251,10 +270,7 @@ dialog select,dialog input,dialog textarea{width:100%}
       <div class="tablewrap"><table id="tKonto" class="resp"></table></div></div>
   </section>
 
-  <section id="tab-splitwise" class="hidden">
-    <div class="kpis" id="kpisSw"></div>
-    <div class="card"><h2>Einträge im Monat</h2><p class="hint" id="hintSw"></p><div class="tablewrap"><table id="tSw" class="resp"></table></div></div>
-  </section>
+
   <p class="note" id="stand"></p>
 </main>
 
@@ -379,14 +395,14 @@ function init(){
   sel.innerHTML=`<optgroup label="Jahresrückblick">`+years.map(y=>`<option value="${y}">Jahr ${y}</option>`).join("")+`</optgroup><optgroup label="Monate">`+ms.slice().reverse().map(m=>`<option value="${m}">${monthName(m)}</option>`).join("")+`</optgroup>`;
   sel.value=cur&&(ms.includes(cur)||years.includes(cur))?cur:ms[ms.length-1];
   const st=FILES.map(f=>D[f]?.stand?`${f}: ${new Date(D[f].stand).toLocaleString("de-DE",{dateStyle:"short",timeStyle:"short"})}`:null).filter(Boolean);
-  $("#stand").textContent="Datenstand – "+st.join(" · ");
+  $("#stand").textContent="Datenstand – "+st.join(" · ");rDots();
   render();
 }
 function kpi(label,value,sub,cls="",go=""){return `<div class="card kpi${go?" go":""}"${go?` data-go="${go}" role="button" tabindex="0"`:""}><div class="label">${label}${go?`<span class="goi" aria-hidden="true">${go.startsWith("#")?"▾":"›"}</span>`:""}</div><div class="value ${cls}">${value}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`}
 function render(){const m=$("#month").value;if(!m)return;
   const isY=/^\d{4}$/.test(m);document.querySelectorAll("main section").forEach(x=>x.classList.toggle("hidden",isY?x.id!=="tab-jahr":x.id!=="tab-"+tab));
   document.querySelector("nav").classList.toggle("dim",isY);if(isY)return rJahr(m);
-  ({uebersicht:rUeb,rueckblick:rRb,fix:rFix,mutti:rMutti,variabel:rVar,laden:rLaden,splitwise:rSw,konto:rKonto})[tab](m)}
+  ({uebersicht:rUeb,rueckblick:rRb,fix:rFix,mutti:rMutti,variabel:rVar,laden:rLaden,splitwise:rSw,konto:rKonto})[tab](m);if(tab==="laden")rSw(m)}
 
 function mkChart(id,conf){charts[id]?.destroy();charts[id]=new Chart(document.getElementById(id),conf);return charts[id]}
 function baseOpts(extra={}){const t2=css("--text-2"),ln=css("--line");return Object.assign({responsive:true,maintainAspectRatio:false,
@@ -401,8 +417,8 @@ function rUeb(m){rUew(m);
   $("#kpis").innerHTML=kpi("Einnahmen (netto)",eur(ein),who+(person==="claudia"?" · laut Kostentabelle":kEin!=null?" · Andre laut Konto (Gehalt, Miete u. a.)":" · Andre laut Kostentabelle (noch kein Kontoauszug)"),"",person==="claudia"?"":"konto")+
     kpi("Fixkosten",eur(fix),`${fixAktiv(m).length} aktive Posten`+(person==="alle"?"":" · dein Anteil"),"","fix")+
     kpi("Laden",eur(lad),person==="alle"?`${monthName(m)} · laut Rechnungen`:`Anteil ${Math.round((person==="andre"?ladenQuote():1-ladenQuote())*100)} % laut Splitwise`,"","laden")+
-    kpi("Sonstiges Auto",eur(auto),"Splitwise ohne Laden & Ausgleich","","splitwise")+
-    kpi("Variable Kosten",eur(vari),"Splitwise: Alltag, Hobby, Urlaub","","variabel")+
+    kpi("Sonstiges Auto",eur(auto),"Splitwise ohne Laden & Ausgleich","","laden")+
+    kpi("Variable Kosten",eur(vari),(()=>{const bs=budgetStand(m);return bs.length?bs.map(x=>`${x.n} ${Math.round(x.q*100)} %${x.q>1?" ⚠︎":""}`).join(" · ")+" vom Budget":"Splitwise: Alltag, Hobby, Urlaub"})(),"","variabel")+
     kpi("Frei verfügbar",eur(frei),"Einnahmen − alle Kosten",frei>=0?"pos":"neg","rueckblick");
   // Aufteilung als horizontale Balken (Kategorie-Summen)
   const kat={};fixAktiv(m).forEach(({p,per})=>kat[p.kategorie]=(kat[p.kategorie]||0)+share(per.andre,per.claudi));
@@ -450,7 +466,9 @@ function rFix(m){
     .sort((a,b)=>a.p.kategorie.localeCompare(b.p.kategorie,"de")||a.beendet-b.beendet||a.p.posten.localeCompare(b.p.posten,"de"));
   const w=person==="alle";
   const q=($("#qFix").value||"").trim().toLowerCase();
-  const rowsQ=q?rows.filter(({p})=>[p.posten,p.anbieter,p.kategorie].join(" ").toLowerCase().includes(q)):rows;
+  const ruhend=({per,beendet,kommt})=>!beendet&&!kommt&&!(per.gesamt>0);const nR=rows.filter(ruhend).length;
+  $("#btnRuhend").textContent=zeigRuhend?`Ruhende ausblenden`:`${nR} ruhende (0 €) einblenden`;$("#btnRuhend").classList.toggle("hidden",!nR);
+  const rowsQ=(q?rows.filter(({p})=>[p.posten,p.anbieter,p.kategorie].join(" ").toLowerCase().includes(q)):rows).filter(r=>zeigRuhend||q||!ruhend(r));
   let h=`<thead><tr><th>Posten</th><th>Anbieter</th><th class="n">Andre</th><th class="n">Claudia</th><th class="n">Regine</th><th class="n">Gesamt</th><th class="n">bisher</th><th></th></tr></thead><tbody>`,last=null;
   if(!rowsQ.length)h+=`<tr><td colspan="8">Kein Posten passt zu „${q}“.</td></tr>`;
   rowsQ.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="8">${p.kategorie}</td></tr>`;last=p.kategorie}
@@ -517,7 +535,7 @@ function rSw(m){
 
 
 /* ---------- Fixkosten bearbeiten (speichert in data/fixkosten.json im privaten Repo) ---------- */
-let edId=null;
+let edId=null,zeigRuhend=false;
 const MON=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 const rh=p=>p.rhythmus||"monatlich",istJahr=p=>rh(p)!=="monatlich";
 const jahr=(per,k)=>per.jahr?.[k]??Math.round((per[k]||0)*1200)/100;
@@ -666,7 +684,17 @@ const BEREICHE=[["alltag","Alltag",g=>/lebensmittel|restaurant/i.test(g)],["hobb
 const bereichOf=g=>BEREICHE.find(b=>b[2](g))[0];
 let varB="alle";
 function varMonat(m,b){return varRows().filter(x=>ym(x.datum)===m&&(!b||bereichOf(x.gruppe)===b)).reduce((s,x)=>s+share(x.anteil_andre,x.anteil_claudia),0)}
-function rVar(m){
+function budgetStand(m){const B=D.fixkosten?.budgets||{};const tag=new Date(),aktuell=m===`${tag.getFullYear()}-${String(tag.getMonth()+1).padStart(2,"0")}`;
+  const anteil=aktuell?tag.getDate()/new Date(tag.getFullYear(),tag.getMonth()+1,0).getDate():1;
+  return BEREICHE.filter(([k])=>B[k]).map(([k,n])=>{const ist=varRows().filter(x=>ym(x.datum)===m&&bereichOf(x.gruppe)===k).reduce((s,x)=>s+x.anteil_andre+x.anteil_claudia,0);
+    const q=ist/B[k],farbe=q>1?"--s8":q>Math.max(anteil,.1)+.1?"--s4":"--good";return {k,n,ist,b:B[k],q,farbe,anteil,aktuell}})}
+function rBudget(m){const bs=budgetStand(m);$("#cardBudget").classList.toggle("hidden",!bs.length);if(!bs.length)return;
+  $("#hintBudget").textContent=`gemeinsam (Andre + Claudia) laut Splitwise`+(bs[0].aktuell?` · Monat zu ${Math.round(bs[0].anteil*100)} % vorbei – gelb = schneller als geplant, rot = überschritten`:" · gelb = knapp, rot = überschritten");
+  $("#budget").innerHTML=bs.map(x=>`<div class="row"><span>${x.n}</span><div class="bar2" title="${Math.round(x.q*100)} %"><b style="width:${Math.min(100,x.q*100)}%;background:var(${x.farbe})"></b></div><span class="n">${eur(x.ist)} / ${eur(x.b)}${x.q<=1?` · noch ${eur(x.b-x.ist)}`:` · ${eur(x.ist-x.b)} drüber`}</span></div>`).join("")}
+function openBudget(){const B=D.fixkosten?.budgets||{};const a=numIn(prompt("Budget Alltag (Lebensmittel, Restaurant) pro Monat, gemeinsam (€):",B.alltag??""));if(a==null||isNaN(a))return;
+  const h=numIn(prompt("Budget Hobby & Co pro Monat, gemeinsam (€):",B.hobby??""));if(h==null||isNaN(h))return;
+  commitFix(data=>{data.budgets=Object.assign(data.budgets||{},{alltag:a,hobby:h});const t=`Budget: Alltag ${eur(a)}, Hobby ${eur(h)} pro Monat`;data.aenderungen=data.aenderungen||[];data.aenderungen.push({zeit:new Date().toISOString().slice(0,16),art:"aenderung",von:"Andre",beschreibung:t});return t}).then(()=>render()).catch(e=>alert(e.message))}
+function rVar(m){rBudget(m);
   if(!D.splitwise_variabel||D.splitwise_variabel.error||!varRows().length){$("#kpisVar").innerHTML=kpi("Variable Kosten","–","Noch keine Daten – der Splitwise-Abruf holt sie täglich.");return}
   const tot=varMonat(m),L=last12(m),avg=L.slice(0,11).reduce((s,k)=>s+varMonat(k),0)/11;
   $("#kpisVar").innerHTML=kpi("Variable Kosten",eur(tot),monthName(m)+(person!=="alle"?" · Anteil "+(person==="andre"?"Andre":"Claudia"):""))+
@@ -812,14 +840,22 @@ function dauerauftrag(art,m){ // Betrag für Monat m: Kontoauszug, sonst vereinb
   if(v&&(!b||v.ab>=b.datum.slice(0,8)+"01"))return {betrag:v.betrag,quelle:`Dauerauftrag seit ${new Date(v.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})}`,notiz:v.notiz};
   if(b&&person!=="claudia")return {betrag:-b.betrag,quelle:`zuletzt überwiesen ${new Date(b.datum).toLocaleDateString("de-DE")}`};
   return null}
-function rUew(m){setTimeout(syncOpen);
+function rDots(){const tage=d=>d?(Date.now()-new Date(d).getTime())/864e5:null,dd=d=>new Date(d).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
+  const dot=(n,t,ok,alt,txt)=>t==null?"":`<span title="${n}: ${txt}"><i class="${t<=ok?"ok":t<=alt?"alt":"rot"}"></i>${n} ${txt}</span>`;
+  const sw=D.splitwise?.stand,la=D.laden?.stand;let h=dot("Splitwise",tage(sw),2,7,sw?dd(sw):"")+dot("Laden",tage(la),9,16,la?dd(la):"");
+  const kb=(D.konto_andre?.buchungen||[]);if(kb.length&&person!=="claudia"){const last=kb.map(x=>ym(x.datum)).sort().at(-1),n=new Date(),vm=new Date(n.getFullYear(),n.getMonth()-1,1),soll=`${vm.getFullYear()}-${String(vm.getMonth()+1).padStart(2,"0")}`;
+    const [y,mo]=last.split("-");h+=`<span title="Letzter Kontoauszug"><i class="${last>=soll?"ok":n.getDate()<=6?"alt":"rot"}"></i>Konto bis ${new Date(+y,+mo-1,1).toLocaleDateString("de-DE",{month:"short",year:"2-digit"})}</span>`}
+  $("#dots").innerHTML=h}
+function faellig(m){const mo=+m.slice(5,7);return fixAktiv(m).filter(({p})=>istJahr(p)&&(p.faellig||[]).includes(mo)).map(({p,per})=>({p,per,betrag:Math.round(jahr(per,"gesamt")/(p.faellig.length)*100)/100}))}
+function rUew(m){setTimeout(syncOpen);const fl=faellig(m),flA=fl.filter(x=>zahltAndre(x.p)).reduce((s,x)=>s+x.betrag,0);
+  $("#boxFl").innerHTML=`<h2 style="font-size:14px">Diesen Monat fällig</h2><ul class="faellig">`+fl.map(x=>`<li><span>${x.p.posten}<span class="sub2">${x.p.kategorie} · zahlt ${x.p.wer_zahlt}${zahltAndre(x.p)?" – vom Rücklagekonto":""}</span></span><b>${eur(x.betrag,2)}</b></li>`).join("")+`</ul>`;
   const rl=ruecklage(m),rlS=rl.reduce((s,x)=>s+x.per.gesamt,0),ag=ausgleich(m);
   const dR=dauerauftrag("ruecklage",m),dA=dauerauftrag("ausgleich_claudia",m);
   const chk=(ist,soll)=>Math.abs(ist-soll)<0.5?"passt zu den Fixkosten":`Fixkosten ergeben ${eur(soll,2)} (${ist>soll?"+":"−"}${eur(Math.abs(ist-soll),2)})`;
   $("#hintUew").textContent=`${monthName(m)} · was du monatlich überweist · auf einen Betrag tippen für die Aufstellung`;
   $("#kpisUew").innerHTML=kpi("Aufs Rücklagekonto",eur(dR?dR.betrag:rlS,2),dR?`${dR.quelle} · ${chk(dR.betrag,rlS)}`:`laut Fixkosten (${rl.length} jährliche Beiträge)`,dR&&Math.abs(dR.betrag-rlS)>=0.5?"neg":"","#boxRl")+
     kpi("An Claudia (Ausgleich)",eur(dA?dA.betrag:ag.netto,2),dA?`${dA.quelle} · ${chk(dA.betrag,ag.netto)}`:"laut Fixkosten",dA&&Math.abs(dA.betrag-ag.netto)>=0.5?"neg":"","#boxAg")+
-    kpi("Zusammen",eur((dR?dR.betrag:rlS)+(dA?dA.betrag:ag.netto),2),"Daueraufträge am Monatsanfang")+
+    kpi("Diesen Monat fällig",fl.length?eur(flA,2):"nichts",fl.length?`${fl.length} Jahresbeitr${fl.length>1?"äge":"ag"}${flA?` · ${eur(flA,2)} vom Rücklagekonto holen`:""}`:"keine jährlichen Beiträge in "+monthName(m).split(" ")[0],"",fl.length?"#boxFl":"")+
     (person!=="claudia"?`<div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s" onclick="openUew('ruecklage')">Rücklage-Betrag ändern ✎</button><button class="btn-s" onclick="openUew('ausgleich_claudia')">Ausgleich-Betrag ändern ✎</button></div>`:"");
   $("#tRl").innerHTML=`<thead><tr><th>Posten</th><th class="n">Jahr</th><th class="n">Monat</th></tr></thead><tbody>`+
     rl.sort((a,b)=>b.per.gesamt-a.per.gesamt).map(({p,per})=>`<tr><td>${p.posten}<span class="sub2">${p.kategorie} · ${rh(p)}${faelligTxt(p)?`, fällig ${faelligTxt(p)}`:""}${per.claudi>0?` · Claudias Anteil ${eur(jahr(per,"claudi"),2)}/Jahr`:""}</span></td><td class="n">${eur(jahr(per,"gesamt"),2)}</td><td class="n">${eur(per.gesamt,2)}</td></tr>`).join("")+
@@ -911,8 +947,8 @@ $("#qKonto").oninput=()=>tab==="konto"&&rKonto($("#month").value);
 $("#qFix").oninput=()=>tab==="fix"&&rFix($("#month").value);
 $("#qVar").oninput=()=>tab==="variabel"&&rVar($("#month").value);
 $("#month").onchange=render;
-document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{person=b.dataset.p;document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;if(/^\d{4}$/.test($("#month").value)){const y=$("#month").value,opts=[...$("#month").options].map(o=>o.value).filter(v=>v.startsWith(y+"-"));$("#month").value=opts[0]}document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));
+document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{person=b.dataset.p;rDots();document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;if(/^\d{4}$/.test($("#month").value)){const y=$("#month").value,opts=[...$("#month").options].map(o=>o.value).filter(v=>v.startsWith(y+"-"));$("#month").value=opts[0]}document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));b.scrollIntoView({block:"nearest",inline:"center"});
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hidden",s.id!=="tab-"+tab));render()});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
 load();
