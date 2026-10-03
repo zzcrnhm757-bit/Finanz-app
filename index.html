@@ -471,9 +471,10 @@ function rFix(m){
     .sort((a,b)=>a.p.kategorie.localeCompare(b.p.kategorie,"de")||a.beendet-b.beendet||a.p.posten.localeCompare(b.p.posten,"de"));
   const w=person==="alle";
   const q=($("#qFix").value||"").trim().toLowerCase();
-  const ruhend=({per,beendet,kommt})=>!beendet&&!kommt&&!(per.gesamt>0);const nR=rows.filter(ruhend).length;
-  $("#btnRuhend").textContent=zeigRuhend?`Ruhende ausblenden`:`${nR} ruhende (0 €) einblenden`;$("#btnRuhend").classList.toggle("hidden",!nR);
-  const rowsQ=(q?rows.filter(({p})=>[p.posten,p.anbieter,p.kategorie].join(" ").toLowerCase().includes(q)):rows).filter(r=>zeigRuhend||q||!ruhend(r));
+  // ausgeblendet: beendete Posten, Posten mit 0 € und – in der Sicht Andre/Claudia – Posten ohne eigenen Anteil
+  const ruhend=({per,beendet,kommt})=>beendet||(!kommt&&(!(per.gesamt>0)||(person!=="alle"&&!(share(per.andre,per.claudi)>0)&&!(person==="andre"&&per.mutti>0))));const nR=rows.filter(ruhend).length;
+  $("#btnRuhend").textContent=zeigRuhend?`Ausgeblendete verbergen`:`${nR} ausgeblendet (beendet / 0 €${person==="alle"?"":" / ohne deinen Anteil"}) – einblenden`;$("#btnRuhend").classList.toggle("hidden",!nR);
+  const rowsQ=(q?rows.filter(({p})=>[p.posten,p.anbieter,p.kategorie].join(" ").toLowerCase().includes(q)):rows).filter(r=>zeigRuhend||!ruhend(r));
   let h=`<thead><tr><th>Posten</th><th>Anbieter</th><th class="n">Andre</th><th class="n">Claudia</th><th class="n">Regine</th><th class="n">Gesamt</th><th class="n">bisher</th><th></th></tr></thead><tbody>`,last=null;
   if(!rowsQ.length)h+=`<tr><td colspan="8">Kein Posten passt zu „${q}“.</td></tr>`;
   rowsQ.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="8">${p.kategorie}</td></tr>`;last=p.kategorie}
