@@ -59,6 +59,8 @@ main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
 .dleg i{width:10px;height:10px;border-radius:3px}.dleg .n{font-variant-numeric:tabular-nums;text-align:right}.dleg .p{color:var(--text-3);min-width:38px}
 @media (max-width:560px){.donut{grid-template-columns:1fr}.donut .chart{height:200px;max-width:220px;margin:0 auto}}
 .swipehint{display:none}
+.facebox{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:12px 0 4px;background:var(--surface-2)}
+body.gesperrt main section,body.gesperrt #stand,body.gesperrt nav,body.gesperrt .seg,body.gesperrt #month,body.gesperrt #dots{display:none!important}
 @media (max-width:560px){nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}nav::-webkit-scrollbar{display:none}nav button{white-space:nowrap;flex:0 0 auto}.bar{padding:10px 16px;gap:8px}}
 .dots{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--text-3);width:100%}.dots span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .dots i{width:8px;height:8px;border-radius:50%;display:inline-block}.dots i.ok{background:var(--good,#1baf7a)}.dots i.alt{background:var(--s4)}.dots i.rot{background:var(--s8)}
@@ -158,6 +160,10 @@ dialog select,dialog input,dialog textarea{width:100%}
 </header>
 
 <main>
+  <div id="lock" class="card empty hidden" style="text-align:center;padding:48px 20px">
+    <div style="font-size:44px;line-height:1">🔒</div><p><strong>Haushalt ist gesperrt</strong></p>
+    <button class="primary" onclick="entsperren()" style="font-size:16px;padding:12px 22px">Mit Face ID entsperren</button>
+    <p class="note" id="lockMsg" style="color:var(--bad)"></p></div>
   <div id="empty" class="card empty hidden">
     <p><strong>Noch keine Daten verbunden.</strong></p>
     <p id="err" class="note" style="color:var(--bad)"></p>
@@ -281,6 +287,10 @@ dialog select,dialog input,dialog textarea{width:100%}
   <label for="fOwner">GitHub-Benutzer</label><input id="fOwner" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="z. B. zzcrnhm757-bit" autocomplete="off">
   <label for="fRepo">Daten-Repository</label><input id="fRepo" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Finanzdaten" autocomplete="off">
   <label for="fToken">Zugangsschlüssel</label><input id="fToken" autocapitalize="off" autocorrect="off" spellcheck="false" type="password" placeholder="github_pat_…" autocomplete="off">
+  <div class="facebox"><strong>🔒 Face ID</strong> <span class="sub2" id="faceState"></span>
+    <p class="note" style="margin:4px 0 8px">Mit Face ID wird der Schlüssel verschlüsselt auf diesem Gerät gespeichert und die App nach 5 Minuten im Hintergrund wieder gesperrt.</p>
+    <button class="btn-s primary" id="btnFaceAn" onclick="faceIdEinrichten()">Face ID einrichten</button><button class="btn-s" id="btnFaceAus" onclick="faceIdAus()">Face ID ausschalten</button>
+    <p class="note" id="faceMsg" style="margin:6px 0 0"></p></div>
   <div class="row">
     <button onclick="forget()">Auf diesem Gerät löschen</button>
     <button onclick="dlg.close()">Abbrechen</button>
@@ -346,10 +356,57 @@ const monthName=k=>{const [y,m]=k.split("-");return new Date(+y,+m-1,1).toLocale
 const monthShort=k=>{const [y,m]=k.split("-");return new Date(+y,+m-1,1).toLocaleDateString("de-DE",{month:"short",year:"2-digit"})};
 let D={},person="alle",tab="uebersicht",charts={};
 
-function cfg(){try{return JSON.parse(localStorage.getItem("finanzCfg")||"{}")}catch(e){return {}}}
-function openSettings(){const c=cfg();fOwner.value=c.owner||"zzcrnhm757-bit";fRepo.value=c.repo||"Finanzdaten";fToken.value=c.token||"";dlg.showModal()}
-function saveSettings(){cfgOk=true;try{localStorage.setItem("finanzCfg",JSON.stringify({owner:fOwner.value.trim(),repo:fRepo.value.trim(),token:fToken.value.trim()}))}catch(e){cfgOk=false}dlg.close();load()}
-function forget(){try{localStorage.removeItem("finanzCfg")}catch(e){}dlg.close();location.reload()}
+/* ---------- Zugang & Face ID ----------
+   Ohne Face ID: Schlüssel liegt im Browser-Speicher (finanzCfg).
+   Mit Face ID (Modus "prf"): der Schlüssel liegt nur verschlüsselt im Speicher; den Entschlüssel-Schlüssel liefert
+   der Passkey dieses Geräts (WebAuthn-PRF) erst nach Face ID. Modus "gate" (ältere Geräte): Face ID als Sperre. */
+let memCfg=null,entsperrt=false;
+const rawCfg=()=>{try{return JSON.parse(localStorage.getItem("finanzCfg")||"{}")}catch(e){return {}}};
+const lockInfo=()=>{try{return JSON.parse(localStorage.getItem("finanzLock")||"null")}catch(e){return null}};
+function cfg(){const l=lockInfo(),c=rawCfg();if(!l)return c;if(!entsperrt)return {owner:c.owner,repo:c.repo};return memCfg||c}
+const b64u={enc:b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""),
+  dec:s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((s.length+3)%4)),c=>c.charCodeAt(0))};
+const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+async function prfKey(secret){const k=await crypto.subtle.importKey("raw",secret,"HKDF",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"HKDF",hash:"SHA-256",salt:new Uint8Array(0),info:new TextEncoder().encode("finanz-app-token")},k,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])}
+async function passkeyGet(l){const a=await navigator.credentials.get({publicKey:{challenge:rnd(32),rpId:location.hostname,userVerification:"required",timeout:60000,
+    allowCredentials:[{type:"public-key",id:b64u.dec(l.credId)}],extensions:{prf:{eval:{first:b64u.dec(l.salt)}}}}});
+  return a.getClientExtensionResults()?.prf?.results?.first||null}
+async function faceIdEinrichten(){const c=rawCfg();const msg=t=>$("#faceMsg").textContent=t;
+  if(!c.token)return msg("Bitte zuerst den Zugangsschlüssel speichern.");
+  if(!window.PublicKeyCredential)return msg("Dieser Browser unterstützt keine Passkeys.");
+  try{msg("Face ID bestätigen …");const salt=rnd(32);
+    const cr=await navigator.credentials.create({publicKey:{challenge:rnd(32),rp:{name:"Haushalt",id:location.hostname},user:{id:rnd(16),name:"andre-finanzen",displayName:"Haushalt (Finanz-App)"},
+      pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"preferred"},
+      timeout:60000,extensions:{prf:{eval:{first:salt}}}}});
+    const l={credId:b64u.enc(cr.rawId),salt:b64u.enc(salt)};
+    let sec=cr.getClientExtensionResults()?.prf?.results?.first||null;
+    if(!sec&&cr.getClientExtensionResults()?.prf?.enabled!==false){msg("Noch einmal Face ID bestätigen …");sec=await passkeyGet(l)}
+    if(sec){const key=await prfKey(sec),iv=rnd(12);const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(c.token));
+      Object.assign(l,{mode:"prf",iv:b64u.enc(iv),ct:b64u.enc(ct)});localStorage.setItem("finanzLock",JSON.stringify(l));
+      localStorage.setItem("finanzCfg",JSON.stringify({owner:c.owner,repo:c.repo}));memCfg=c}
+    else{l.mode="gate";localStorage.setItem("finanzLock",JSON.stringify(l))}
+    entsperrt=true;faceStatus();msg(l.mode==="prf"?"Face ID ist aktiv – der Schlüssel ist jetzt verschlüsselt gespeichert.":"Face ID ist als Sperre aktiv (dieses Gerät kann den Schlüssel nicht verschlüsseln).")}
+  catch(e){msg(e.name==="NotAllowedError"?"Abgebrochen.":"Fehler: "+e.message)}}
+function faceIdAus(){if(!entsperrt)return;const c=cfg();localStorage.setItem("finanzCfg",JSON.stringify(c));localStorage.removeItem("finanzLock");memCfg=null;faceStatus();$("#faceMsg").textContent="Face ID ist aus. Den Passkey „Haushalt“ kannst du in den iPhone-Einstellungen › Passwörter löschen."}
+async function entsperren(){const l=lockInfo();if(!l)return;$("#lockMsg").textContent="";
+  try{const sec=await passkeyGet(l);
+    if(l.mode==="prf"){if(!sec)throw new Error("Der Passkey hat keinen Schlüssel geliefert.");const key=await prfKey(sec);
+      const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64u.dec(l.iv)},key,b64u.dec(l.ct));memCfg={...rawCfg(),token:new TextDecoder().decode(pt)}}
+    entsperrt=true;$("#lock").classList.add("hidden");document.body.classList.remove("gesperrt");load()}
+  catch(e){$("#lockMsg").textContent=e.name==="NotAllowedError"?"Abgebrochen – noch einmal tippen.":"Entsperren fehlgeschlagen: "+e.message}}
+function sperren(){if(!lockInfo())return;memCfg=null;entsperrt=false;D={};Object.values(charts).forEach(c=>c.destroy());charts={};
+  document.body.classList.add("gesperrt");$("#lock").classList.remove("hidden")}
+let versteckt=0;document.addEventListener("visibilitychange",()=>{if(document.hidden)versteckt=Date.now();else if(lockInfo()&&entsperrt&&Date.now()-versteckt>5*60e3)sperren()});
+function faceStatus(){const l=lockInfo();$("#faceState").textContent=l?(l.mode==="prf"?"aktiv (Schlüssel verschlüsselt)":"aktiv (als Sperre)"):"aus";
+  $("#btnFaceAn").classList.toggle("hidden",!!l);$("#btnFaceAus").classList.toggle("hidden",!l)}
+function openSettings(){const c=cfg(),l=lockInfo();fOwner.value=c.owner||"zzcrnhm757-bit";fRepo.value=c.repo||"Finanzdaten";fToken.value=l?"":(c.token||"");
+  fToken.placeholder=l?"gespeichert – nur zum Ersetzen ausfüllen":"github_pat_…";$("#faceMsg").textContent="";faceStatus();dlg.showModal()}
+function saveSettings(){cfgOk=true;const l=lockInfo(),t=fToken.value.trim();
+  try{if(l&&!t){localStorage.setItem("finanzCfg",JSON.stringify({...rawCfg(),owner:fOwner.value.trim(),repo:fRepo.value.trim()}));if(memCfg)Object.assign(memCfg,{owner:fOwner.value.trim(),repo:fRepo.value.trim()})}
+    else{localStorage.setItem("finanzCfg",JSON.stringify({owner:fOwner.value.trim(),repo:fRepo.value.trim(),token:t}));if(l){localStorage.removeItem("finanzLock");memCfg=null;alert("Neuer Schlüssel gespeichert – Face ID bitte unter ⚙︎ neu einrichten.")}}}
+  catch(e){cfgOk=false}dlg.close();load()}
+function forget(){try{localStorage.removeItem("finanzCfg");localStorage.removeItem("finanzLock")}catch(e){}dlg.close();location.reload()}
 $("#btnSettings").onclick=openSettings;
 
 async function getFile(name){
@@ -1019,7 +1076,7 @@ document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{person=b.data
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;if(/^\d{4}$/.test($("#month").value)){const y=$("#month").value,opts=[...$("#month").options].map(o=>o.value).filter(v=>v.startsWith(y+"-"));$("#month").value=opts[0]}document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));b.scrollIntoView({block:"nearest",inline:"center"});
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hidden",s.id!=="tab-"+tab));render()});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
-load();
+if(lockInfo()){document.body.classList.add("gesperrt");$("#lock").classList.remove("hidden");if(lockInfo().mode==="gate")entsperrt=false}else load();
 </script>
 </body>
 </html>
