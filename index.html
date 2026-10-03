@@ -228,7 +228,8 @@ dialog select,dialog input,dialog textarea{width:100%}
       <div class="card"><h2>Verlauf</h2><p class="hint">Restschuld nach Verrechnung und ETF-Guthaben für Regine · gestrichelt = Ausblick</p><div class="chart"><canvas id="cMutti"></canvas></div></div>
       <div class="card"><div class="toolbar"><h2>Monatliche Verrechnung</h2></div><p class="hint">Verträge, die Andre zahlt und die Regine mitnutzt</p><div class="tablewrap"><table id="tMuttiPosten" class="resp"></table></div>
         <h2 style="margin-top:16px">ETF für Regine</h2><p class="hint" id="hintEtf"></p><div class="tablewrap"><table id="tEtf" class="resp"></table></div>
-        <div class="row" style="justify-content:flex-start"><button class="btn-s" onclick="openEtf()">ETF-Stand eintragen ✎</button><button class="btn-s" onclick="openMuttiStart()">Grunddaten ✎</button></div></div>
+        <h2 style="margin-top:16px">Sondertilgungen</h2><div class="tablewrap"><table id="tSonder" class="resp"></table></div>
+        <div class="row" style="justify-content:flex-start"><button class="btn-s primary" onclick="openSonder()">+ Sondertilgung</button><button class="btn-s" onclick="openEtf()">ETF-Stand eintragen ✎</button><button class="btn-s" onclick="openMuttiStart()">Grunddaten ✎</button></div></div>
     </div>
     <div class="card full"><h2>Monat für Monat</h2><div class="tablewrap"><table id="tMuttiMon" class="resp"></table></div></div>
   </section>
@@ -287,6 +288,24 @@ dialog select,dialog input,dialog textarea{width:100%}
   </div>
 </dialog>
 
+<dialog id="dlgZu">
+  <h2 style="margin:0 0 4px;font-size:17px">Zahlung zuordnen</h2>
+  <p class="note" style="margin-top:0" id="zuInfo"></p>
+  <div class="arten">
+    <label><input type="radio" name="zuWer" value="ich" checked><span>Nur ich<small>Bleibt eine eigene Ausgabe von Andre.</small></span></label>
+    <label><input type="radio" name="zuWer" value="gemeinsam"><span>Gemeinsam mit Claudia<small>Wird beim nächsten Splitwise-Abgleich eingetragen (du hast bezahlt).</small></span></label>
+  </div>
+  <div class="form">
+    <div class="f-gem"><label for="zuGruppe">Splitwise-Gruppe</label><select id="zuGruppe"></select></div>
+    <div class="f-gem"><label for="zuAnteil">Claudias Anteil</label><select id="zuAnteil"><option value="0.5">50 %</option><option value="0.6667">2/3</option><option value="1">100 % (nur für Claudia)</option></select></div>
+    <div class="w2"><label for="zuKat">Kategorie</label><input id="zuKat" list="zuKatList"></div>
+    <div class="w2 f-gem"><label for="zuText">Beschreibung in Splitwise</label><input id="zuText"></div>
+  </div>
+  <datalist id="zuKatList"></datalist>
+  <p class="note" id="zuErr" style="color:var(--bad)"></p>
+  <div class="row"><button onclick="dlgZu.close()">Abbrechen</button><button class="primary" id="zuSave" onclick="saveZu()">Speichern</button></div>
+</dialog>
+
 <dialog id="dlgEdit">
   <h2 style="margin:0 0 4px;font-size:17px" id="edTitle">Posten ändern</h2>
   <p class="note" style="margin-top:0" id="edInfo"></p>
@@ -316,7 +335,7 @@ dialog select,dialog input,dialog textarea{width:100%}
 </dialog>
 
 <script>
-const FILES=["fixkosten","splitwise","laden","km","splitwise_variabel","konto_andre"];const OPTIONAL=["km","splitwise_variabel","konto_andre"];
+const FILES=["fixkosten","splitwise","laden","km","splitwise_variabel","konto_andre","konto_zuordnung"];const OPTIONAL=["km","splitwise_variabel","konto_andre","konto_zuordnung"];
 const PROV=["IONITY","L-Strom.drive","E.ON Drive","BMW Charging","Sonstige"];
 const $=s=>document.querySelector(s);
 const eur=(v,d=0)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:d,maximumFractionDigits:d});
@@ -602,18 +621,20 @@ function applyEdit(data,op){ // wendet die Änderung auf eine frische Kopie der 
 
 const b64=str=>{const b=new TextEncoder().encode(str);let s="";b.forEach(x=>s+=String.fromCharCode(x));return btoa(s)};
 const unb64=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,"")),c=>c.charCodeAt(0)));
-async function commitFix(mutator){ // lädt die aktuelle Datei, ändert sie und speichert sie (mit einem Wiederholversuch)
+async function commitData(file,mutator,leer){ // lädt data/<file>.json, ändert sie und speichert sie (legt sie bei Bedarf an)
   const c=cfg();if(!c.owner||!c.token)throw new Error("Zum Speichern muss die Datenquelle (⚙︎) eingerichtet sein.");
-  const url=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/data/fixkosten.json`,H={Authorization:`Bearer ${c.token}`,Accept:"application/vnd.github+json"};
+  const url=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/data/${file}.json`,H={Authorization:`Bearer ${c.token}`,Accept:"application/vnd.github+json"};
   for(let versuch=0;versuch<2;versuch++){
-    const g=await fetch(url,{headers:H,cache:"no-store"});if(!g.ok)throw new Error(`Laden fehlgeschlagen (${g.status})`);
-    const meta=await g.json();const data=JSON.parse(unb64(meta.content));const text=mutator(data);
-    const r=await fetch(url,{method:"PUT",headers:H,body:JSON.stringify({message:`App: ${text}`.slice(0,120),content:b64(JSON.stringify(data,null,1)),sha:meta.sha})});
+    const g=await fetch(url,{headers:H,cache:"no-store"});let meta=null,data;
+    if(g.status===404&&leer)data=JSON.parse(JSON.stringify(leer));else{if(!g.ok)throw new Error(`Laden fehlgeschlagen (${g.status})`);meta=await g.json();data=JSON.parse(unb64(meta.content))}
+    const text=mutator(data);
+    const r=await fetch(url,{method:"PUT",headers:H,body:JSON.stringify({message:`App: ${text}`.slice(0,120),content:b64(JSON.stringify(data,null,1)),...(meta?{sha:meta.sha}:{})})});
     if(r.status===409||r.status===422)continue;
     if(r.status===403||r.status===404)throw new Error("Dein Zugangsschlüssel darf nur lesen. Zum Ändern braucht Andres Schlüssel „Contents: Read and write“ für Finanzdaten.");
     if(!r.ok)throw new Error(`GitHub antwortet ${r.status}`);
-    D.fixkosten=data;return text}
+    D[file]=data;return text}
   throw new Error("Gleichzeitige Änderung – bitte noch einmal speichern.")}
+const commitFix=m=>commitData("fixkosten",m);
 async function saveEdit(){
   const neu=edId===null,art=neu?"neu":artRadios().find(r=>r.checked).value;
   const op={art,id:edId,datum:$("#eDatum").value,posten:ePosten.value.trim(),kategorie:eKat.value.trim(),anbieter:eAnb.value.trim(),wer:eWer.value,notiz:eNotiz.value.trim(),
@@ -631,21 +652,23 @@ async function saveEdit(){
 /* ---------- Darlehen Regine ---------- */
 const SM=()=>D.fixkosten?.schulden_mutti||{};
 function verrechnung(m){return fixAktiv(m).reduce((s,{per})=>s+(per.mutti||0),0)}
-function muttiStand(m){ // Stand am Ende von Monat m
+const sonder=(von,bis)=>(SM().sondertilgungen||[]).filter(x=>x.datum>=von&&x.datum<=bis);
+function muttiStand(m,bisTag){ // Stand am Ende von Monat m (Sondertilgungen bis bisTag, sonst bis Monatsende)
   const sm=SM();if(sm.start_betrag==null)return null;const ab=ym(sm.verrechnung_ab||sm.stand_datum);
   const ms=m>=ab?monthsBetween(ab,m):[];const verr=ms.reduce((s,k)=>s+verrechnung(k),0);
-  const zur=(sm.zurueckgezahlt_bis_stand||0)+verr;return {verr,zur,rest:sm.start_betrag-zur}}
+  const st=sonder(sm.stand_datum,bisTag||mEnd(m)).reduce((s,x)=>s+x.betrag,0);
+  const zur=(sm.zurueckgezahlt_bis_stand||0)+verr+st;return {verr,st,zur,rest:sm.start_betrag-zur}}
 function etfAm(datum){const e=SM().etf||{};const ein=(e.eingezahlt||[]).filter(x=>x.datum<=datum).at(-1),w=(e.wert||[]).filter(x=>x.datum<=datum).at(-1);return {ein,w}}
 function etfRate(m){const id=SM().etf?.posten;const x=fixAktiv(m).find(a=>a.p.id===id);return x?x.per.gesamt:0}
 function rMutti(m){
   const sm=SM();if(sm.start_betrag==null){$("#kpisMutti").innerHTML=kpi("Darlehen Regine","–","Grunddaten fehlen – über „Grunddaten ✎“ eintragen.");return}
   const heute=new Date().toISOString().slice(0,7),bis=m>=heute?addM(heute,-1):m; // abgeschlossene Monate
-  const st=muttiStand(bis),rate=verrechnung(m),e=etfAm(bis===m?mEnd(m):new Date().toISOString().slice(0,10)),etfW=e.w?.wert??e.ein?.summe??0,etfE=e.ein?.summe??0;
+  const tag=new Date().toISOString().slice(0,10),st=muttiStand(bis,m>=heute?tag:mEnd(bis)),rate=verrechnung(m),e=etfAm(bis===m?mEnd(m):new Date().toISOString().slice(0,10)),etfW=e.w?.wert??e.ein?.summe??0,etfE=e.ein?.summe??0;
   const offen=st.rest-etfW,n=rate>0?Math.ceil(st.rest/rate):null,n2=(rate+etfRate(m))>0?Math.ceil(Math.max(0,offen)/(rate+etfRate(m))):null;
   const fm=k=>k?monthName(k):"–";
   $("#hintMutti").textContent=`Zinsloses Darlehen ${eur(sm.start_betrag)} · Stand ${new Date(sm.stand_datum).toLocaleDateString("de-DE")}: ${eur(sm.zurueckgezahlt_bis_stand)} zurückgezahlt · seitdem wird Regines Anteil an Handy, TV und Netflix angerechnet · Zahlen bis Ende ${monthName(bis)}`;
   $("#kpisMutti").innerHTML=kpi("Restschuld",eur(st.rest,2),`von ${eur(sm.start_betrag)} · ${num(st.zur/sm.start_betrag*100,1)} % getilgt`)+
-    kpi("Zurückgezahlt",eur(st.zur,2),`davon seit ${monthName(ym(sm.verrechnung_ab||sm.stand_datum))} verrechnet ${eur(st.verr,2)}`)+
+    kpi("Zurückgezahlt",eur(st.zur,2),`davon seit ${monthName(ym(sm.verrechnung_ab||sm.stand_datum))} verrechnet ${eur(st.verr,2)}`+(st.st?` · Sondertilgungen ${eur(st.st,2)}`:""))+
     kpi("Monatliche Verrechnung",eur(rate,2),n?`so erledigt in ${n} Monaten (${fm(addM(bis,n))})`:"")+
     kpi("ETF für Regine",eur(etfW,2),e.w?`eingezahlt ${eur(etfE)} · ${etfW-etfE>=0?"+":"−"}${eur(Math.abs(etfW-etfE),2)} (${new Date(e.w.datum).toLocaleDateString("de-DE")})`:`eingezahlt ${eur(etfE)}`,etfW>=etfE?"pos":"neg")+
     kpi("Offen nach ETF",eur(Math.max(0,offen),2),n2!=null?`mit Verrechnung + ${eur(etfRate(m))} ETF/Monat: ${fm(addM(bis,n2))}`:"");
@@ -656,9 +679,13 @@ function rMutti(m){
   const et=SM().etf||{};$("#hintEtf").textContent=`Sparrate ${eur(etfRate(m))}/Monat · wird für Regine gesammelt, nicht mit der Restschuld verrechnet`;
   const pts=[...(et.eingezahlt||[]).map(x=>({d:x.datum,e:x.summe})),...(et.wert||[]).map(x=>({d:x.datum,w:x.wert}))].reduce((o,x)=>{(o[x.d]=o[x.d]||{d:x.d});Object.assign(o[x.d],x);return o},{});
   $("#tEtf").innerHTML=`<thead><tr><th>Stand</th><th class="n">Eingezahlt</th><th class="n">Wert</th></tr></thead><tbody>`+Object.values(pts).sort((a,b)=>a.d<b.d?1:-1).map(x=>`<tr><td>${new Date(x.d).toLocaleDateString("de-DE")}</td><td class="n">${x.e!=null?eur(x.e,2):""}</td><td class="n">${x.w!=null?eur(x.w,2):""}</td></tr>`).join("")+"</tbody>";labelTable($("#tEtf"));
+  const kb=D.konto_andre?.buchungen||[],imKonto=x=>kb.find(b=>/Regine Kraft/i.test(b.empfaenger)&&Math.abs(-b.betrag-x.betrag)<0.01&&Math.abs(new Date(b.datum)-new Date(x.datum))<=6*864e5);
+  const so=(sm.sondertilgungen||[]).slice().sort((a,b)=>a.datum<b.datum?1:-1);
+  $("#tSonder").innerHTML=`<thead><tr><th>Datum</th><th class="n">Betrag</th></tr></thead><tbody>`+(so.length?so.map(x=>`<tr><td>${new Date(x.datum).toLocaleDateString("de-DE")}<span class="sub2">${x.notiz?x.notiz+" · ":""}${imKonto(x)?"✓ im Kontoauszug":kb.length&&x.datum<=kb.at(-1).datum?"⚠︎ nicht im Kontoauszug gefunden":"Kontoauszug folgt"}</span></td><td class="n">${eur(x.betrag,2)}</td></tr>`).join("")
+    +`<tr class="cat"><td>Summe</td><td class="n">${eur(so.reduce((s,x)=>s+x.betrag,0),2)}</td></tr>`:`<tr><td colspan="2">Noch keine Sondertilgung.</td></tr>`)+"</tbody>";labelTable($("#tSonder"));
   // Verlauf + Ausblick (24 Monate)
   const ab=ym(sm.verrechnung_ab||sm.stand_datum),M=monthsBetween(ab,addM(bis,24));
-  const rest=M.map(k=>k<=bis?muttiStand(k).rest:null),fut=M.map((k,i)=>k>=bis?Math.max(0,muttiStand(bis).rest-monthsBetween(addM(bis,1),k).length*rate+(k===bis?0:0)):null);
+  const rest=M.map(k=>k<=bis?muttiStand(k).rest:null),fut=M.map((k,i)=>k>=bis?Math.max(0,st.rest-monthsBetween(addM(bis,1),k).length*rate+(k===bis?0:0)):null);
   const etfLine=M.map(k=>{const x=etfAm(mEnd(k));return k<=bis?(x.ein?.summe??null):null});
   let lastE=etfE;const etfFut=M.map(k=>k>=bis?(k===bis?lastE:(lastE+=etfRate(k))):null);
   mkChart("cMutti",{type:"line",data:{labels:M.map(monthShort),datasets:[
@@ -668,10 +695,17 @@ function rMutti(m){
     {label:"ETF (Ausblick)",data:etfFut,borderColor:css("--s3"),borderDash:[5,4],pointRadius:0}]},
     options:baseOpts({plugins:{legend:{display:true,labels:{color:css("--text-2"),boxWidth:10,filter:i=>!i.text.includes("Ausblick")}}},scales:{x:{grid:{display:false},ticks:{color:css("--text-2")}},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)}}}})});
   // Monat für Monat
-  const MM=monthsBetween(ab,bis).reverse();
+  const MM=monthsBetween(ab,bis).reverse();const lauf=m>=heute&&sonder(heute+"-01",tag).length;
+  const zeile=(k,s,lbl)=>{const so=sonder(k+"-01",mEnd(k)).reduce((a,x)=>a+x.betrag,0);return `<tr><td>${lbl||monthName(k)}</td><td class="n">${lbl?"":eur(verrechnung(k),2)}${so?`<span class="sub2">+ Sondertilgung ${eur(so,2)}</span>`:""}</td><td class="n">${eur(s.zur,2)}</td><td class="n">${eur(s.rest,2)}</td></tr>`};
   $("#tMuttiMon").innerHTML=`<thead><tr><th>Monat</th><th class="n">Verrechnet</th><th class="n">Zurückgezahlt gesamt</th><th class="n">Restschuld</th></tr></thead><tbody>`+
-    MM.map(k=>{const s=muttiStand(k),x=etfAm(mEnd(k));return `<tr><td>${monthName(k)}</td><td class="n">${eur(verrechnung(k),2)}</td><td class="n">${eur(s.zur,2)}</td><td class="n">${eur(s.rest,2)}</td></tr>`}).join("")+
+    (lauf?zeile(heute,st,monthName(heute)+" (läuft)"):"")+MM.map(k=>zeile(k,muttiStand(k))).join("")+
     `<tr><td>Stand ${new Date(sm.stand_datum).toLocaleDateString("de-DE")}</td><td></td><td class="n">${eur(sm.zurueckgezahlt_bis_stand,2)}</td><td class="n">${eur(sm.start_betrag-sm.zurueckgezahlt_bis_stand,2)}</td></tr></tbody>`;labelTable($("#tMuttiMon"))}
+function openSonder(){const d=prompt("Sondertilgung an Regine – Datum der Überweisung (TT.MM.JJJJ):",new Date().toLocaleDateString("de-DE"));if(!d)return;
+  const mt=d.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(!mt)return alert("Bitte als TT.MM.JJJJ.");const iso=`${mt[3]}-${mt[2].padStart(2,"0")}-${mt[1].padStart(2,"0")}`;
+  const b=numIn(prompt("Betrag (€):","1000"));if(b==null||isNaN(b)||b<=0)return;const notiz=(prompt("Notiz (optional):","")||"").trim();
+  commitFix(data=>{const sm=data.schulden_mutti=data.schulden_mutti||{};sm.sondertilgungen=(sm.sondertilgungen||[]).concat({datum:iso,betrag:b,...(notiz?{notiz}:{})}).sort((x,y)=>x.datum<y.datum?-1:1);
+    const t=`Sondertilgung an Regine: ${eur(b,2)} am ${d.trim()}`;data.aenderungen=data.aenderungen||[];data.aenderungen.push({zeit:new Date().toISOString().slice(0,16),art:"sondertilgung",von:"Andre",beschreibung:t});return t})
+    .then(()=>render()).catch(e=>alert(e.message))}
 function openEtf(){const d=prompt("Datum des ETF-Stands (TT.MM.JJJJ):",new Date().toLocaleDateString("de-DE"));if(!d)return;const mt=d.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(!mt)return alert("Bitte als TT.MM.JJJJ.");
   const iso=`${mt[3]}-${mt[2].padStart(2,"0")}-${mt[1].padStart(2,"0")}`;const ein=numIn(prompt("Bisher eingezahlt (€):",""));const w=numIn(prompt("Aktueller Wert laut Depot (€):",""));
   if([ein,w].some(x=>x==null||isNaN(x)))return alert("Bitte beide Beträge eingeben.");
@@ -723,7 +757,11 @@ function rVar(m){rBudget(m);
 
 
 /* ---------- Andres Girokonto (Kontoauszüge) ---------- */
-const kRows=()=>D.konto_andre?.buchungen||[];
+const ZU=()=>D.konto_zuordnung&&!D.konto_zuordnung.error?D.konto_zuordnung.buchungen||{}:{};
+const kRows=()=>{const z=ZU();return (D.konto_andre?.buchungen||[]).map(x=>{const o=z[x.id];if(!o)return x;const y={...x,zu:o};
+  if(o.kategorie)y.kategorie=o.kategorie;
+  if(o.gemeinsam&&!x.splitwise&&x.betrag<0)y.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(-x.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id};
+  return y})};
 const KB=[["Einnahme","Einnahmen","--good"],["Fixkosten","Fixkosten","--s1"],["Laden","Laden","--s3"],["Ausgabe","Eigene Ausgaben","--s2"],["Splitwise","über Splitwise geteilt","--s4"],["Ausgleich","Ausgleich Claudia / Regine","--s5"],["Sparen/Umbuchung","Sparen & Umbuchung","--s7"]];
 const kBer=x=>x.bereich==="Ausgabe"&&x.splitwise?"Splitwise":x.bereich;
 let kFilter="alle";
@@ -756,7 +794,7 @@ function rKonto(m){
   const kk=x=>x.kategorie.replace(" (Erstattung)","").toLowerCase(),exK=q&&kRows().some(x=>ym(x.datum)===m&&kk(x)===q);
   const rows=kRows().filter(x=>ym(x.datum)===m&&(kFilter==="alle"||kBer(x)===kFilter)&&(!q||(exK?kk(x)===q:[x.empfaenger,x.kategorie,x.bereich].join(" ").toLowerCase().includes(q))));
   $("#tKonto").innerHTML=`<thead><tr><th>Buchung</th><th>Kategorie</th><th class="n">Betrag</th></tr></thead><tbody>`+
-    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")}${x.splitwise?` · in Splitwise (${x.splitwise.gruppe}), dein Anteil ${eur(x.splitwise.anteil_andre,2)}`:""}${x.zweck?" · "+x.zweck:""}</span></td><td>${x.kategorie}<span class="sub2">${x.bereich}</span></td><td class="n ${x.betrag>0?"pos":""}">${eur(x.betrag,2)}</td></tr>`).join(""):`<tr><td colspan="3">Keine Buchungen.</td></tr>`)+"</tbody>";
+    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")}${x.splitwise?` · ${x.splitwise.geplant?"wird in Splitwise eingetragen":"in Splitwise"} (${x.splitwise.gruppe}), dein Anteil ${eur(x.splitwise.anteil_andre,2)}`:""}${x.zweck?" · "+x.zweck:""}</span></td><td>${x.kategorie}<span class="sub2">${x.bereich}</span></td><td class="n ${x.betrag>0?"pos":""}">${eur(x.betrag,2)}${x.betrag<0&&(x.bereich==="Ausgabe"||x.zu)?` <button class="btn-s" style="margin-left:6px" onclick="openZu('${x.id}')" aria-label="Zuordnen">${x.zu?.gemeinsam?"👥":"✎"}</button>`:""}</td></tr>`).join(""):`<tr><td colspan="3">Keine Buchungen.</td></tr>`)+"</tbody>";
   labelTable($("#tKonto"))}
 
 
@@ -878,6 +916,32 @@ function openUew(art){const n=art==="ruecklage"?"Rücklagekonto (jährliche Beit
   commitFix(data=>{const u=data.ueberweisungen=data.ueberweisungen||{};u[art]=(u[art]||[]).filter(x=>x.ab!==iso).concat({ab:iso,betrag:b}).sort((x,y)=>x.ab<y.ab?-1:1);
     const t=`Dauerauftrag ${n}: ${eur(b,2)}/Monat ab ${d.trim()}`;data.aenderungen=data.aenderungen||[];data.aenderungen.push({zeit:new Date().toISOString().slice(0,16),art:"aenderung",von:"Andre",beschreibung:t});return t})
     .then(()=>render()).catch(e=>alert(e.message))}
+
+
+/* ---------- Kontobuchungen zuordnen (nur ich / gemeinsam, Kategorie) ---------- */
+let zuId=null,zuId_gesperrt=false;
+const zuSync=()=>{const g=document.querySelector('input[name=zuWer]:checked').value==="gemeinsam";document.querySelectorAll("#dlgZu .f-gem").forEach(e=>e.classList.toggle("hidden",!g))};
+document.querySelectorAll('input[name=zuWer]').forEach(r=>r.onchange=zuSync);
+function openZu(id){const x=kRows().find(b=>b.id===id);if(!x)return;zuId=id;const o=x.zu||{};$("#zuErr").textContent="";
+  const gesperrt=o.splitwise_id||(x.splitwise&&!x.splitwise.geplant);
+  $("#zuInfo").textContent=`${x.empfaenger} · ${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")} · ${eur(-x.betrag,2)}`+(gesperrt?` · steht schon in Splitwise (${x.splitwise?.gruppe||o.gruppe}) – Änderungen bitte dort; Kategorie hier änderbar`:"");
+  const grp=[...new Set((D.splitwise_variabel?.gruppen||[]).filter(g=>g.mit_claudia).map(g=>g.name))];
+  $("#zuGruppe").innerHTML=grp.map(g=>`<option>${g}</option>`).join("");
+  $("#zuKatList").innerHTML=[...new Set((D.konto_andre?.buchungen||[]).map(b=>b.kategorie.replace(" (Erstattung)","")))].sort().map(k=>`<option value="${k}">`).join("");
+  document.querySelector(`input[name=zuWer][value=${o.gemeinsam?"gemeinsam":"ich"}]`).checked=true;
+  $("#zuGruppe").value=o.gruppe||grp.find(g=>/lebensmittel/i.test(g))||grp[0]||"";$("#zuAnteil").value=String(o.anteil_claudia??0.5);
+  $("#zuKat").value=x.kategorie.replace(" (Erstattung)","");$("#zuText").value=o.beschreibung||x.empfaenger.replace(/^PayPal · /,"").replace(/^Kartenzahlung /,"");
+  document.querySelectorAll("#dlgZu input[name=zuWer],#dlgZu select,#zuText").forEach(e=>e.disabled=!!gesperrt);zuId_gesperrt=!!gesperrt;zuSync();dlgZu.showModal()}
+async function saveZu(){const x=(D.konto_andre?.buchungen||[]).find(b=>b.id===zuId);const gem=!zuId_gesperrt&&document.querySelector('input[name=zuWer]:checked').value==="gemeinsam";
+  const kat=$("#zuKat").value.trim();$("#zuSave").disabled=true;$("#zuErr").textContent="Speichere …";
+  try{await commitData("konto_zuordnung",data=>{data.buchungen=data.buchungen||{};const alt=data.buchungen[zuId]||{};
+      const o={...alt,datum:x.kaufdatum||x.datum,betrag:-x.betrag,empfaenger:x.empfaenger,gemeinsam:gem,zeit:new Date().toISOString().slice(0,16)};
+      if(kat&&kat!==x.kategorie.replace(" (Erstattung)",""))o.kategorie=kat;else delete o.kategorie;
+      if(zuId_gesperrt){o.gemeinsam=alt.gemeinsam||false}else if(gem)Object.assign(o,{gruppe:$("#zuGruppe").value,anteil_claudia:+$("#zuAnteil").value,beschreibung:$("#zuText").value.trim()||x.empfaenger});else["gruppe","anteil_claudia","beschreibung"].forEach(k=>delete o[k]);
+      if(o.splitwise_id){o.gemeinsam=true}
+      if(!o.gemeinsam&&!o.kategorie&&!o.splitwise_id)delete data.buchungen[zuId];else data.buchungen[zuId]=o;data.stand=new Date().toISOString().slice(0,16);
+      return `Konto: ${x.empfaenger} ${eur(-x.betrag,2)} → ${gem?"gemeinsam ("+o.gruppe+")":"nur Andre"}${o.kategorie?", Kategorie "+o.kategorie:""}`},{hinweis:"Zuordnungen von Kontobuchungen aus der App (id = Buchungs-ID aus konto_andre.json)",buchungen:{}});
+    dlgZu.close();render()}catch(e){$("#zuErr").textContent=e.message}finally{$("#zuSave").disabled=false}}
 
 /* ---------- Jahresrückblick ---------- */
 function rJahr(y){
