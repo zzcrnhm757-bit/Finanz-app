@@ -205,7 +205,7 @@ dialog select,dialog input,dialog textarea{width:100%}
       <div class="card"><h2>Fixkosten nach Kategorie</h2><p class="hint" id="hintFix"></p><div class="donut"><div class="chart"><canvas id="cFix"></canvas></div><ul class="dleg" id="legFix"></ul></div></div>
     </div>
     <div class="card full"><div class="toolbar"><h2>Alle Posten</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s" id="btnRuhend" onclick="zeigRuhend=!zeigRuhend;rFix($('#month').value)"></button><button class="primary btn-s" onclick="openEdit(null)">+ Neuer Posten</button></div></div>
-      <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
+      <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „pro Jahr“ = Jahresbetrag (fett = tatsächlicher Jahresbeitrag) · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
       <input type="search" id="qFix" placeholder="Posten suchen (Name, Anbieter, Kategorie)" style="width:100%;margin-bottom:8px">
       <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
     <p class="note">Regines Anteile (Spalte „Regine“) werden mit ihrem Darlehen verrechnet – Details im Tab „Darlehen Regine“.</p>
@@ -553,13 +553,13 @@ function rFix(m){
   const ruhend=({per,beendet,kommt})=>beendet||(!kommt&&(!(per.gesamt>0)||(person!=="alle"&&!(share(per.andre,per.claudi)>0)&&!(person==="andre"&&per.mutti>0))));const nR=rows.filter(ruhend).length;
   $("#btnRuhend").textContent=zeigRuhend?`Ausgeblendete verbergen`:`${nR} ausgeblendet (beendet / 0 €${person==="alle"?"":" / ohne deinen Anteil"}) – einblenden`;$("#btnRuhend").classList.toggle("hidden",!nR);
   const rowsQ=(q?rows.filter(({p})=>[p.posten,p.anbieter,p.kategorie].join(" ").toLowerCase().includes(q)):rows).filter(r=>zeigRuhend||!ruhend(r));
-  let h=`<thead><tr><th>Posten</th><th>Anbieter</th><th class="n">Andre</th><th class="n">Claudia</th><th class="n">Regine</th><th class="n">Gesamt</th><th class="n">bisher</th><th></th></tr></thead><tbody>`,last=null;
-  if(!rowsQ.length)h+=`<tr><td colspan="8">Kein Posten passt zu „${q}“.</td></tr>`;
-  rowsQ.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="8">${p.kategorie}</td></tr>`;last=p.kategorie}
+  let h=`<thead><tr><th>Posten</th><th>Anbieter</th><th class="n">Andre</th><th class="n">Claudia</th><th class="n">Regine</th><th class="n">Gesamt</th><th class="n">pro Jahr</th><th class="n">bisher</th><th></th></tr></thead><tbody>`,last=null;
+  if(!rowsQ.length)h+=`<tr><td colspan="9">Kein Posten passt zu „${q}“.</td></tr>`;
+  rowsQ.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="9">${p.kategorie}</td></tr>`;last=p.kategorie}
     const seit=per.ab>"1900"?`seit ${new Date(per.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})}`:"";
     const info=kommt?`startet ${new Date(per.ab).toLocaleDateString("de-DE")}`:beendet?`beendet ${new Date(per.bis).toLocaleDateString("de-DE")}`:per.bis?`endet ${new Date(per.bis).toLocaleDateString("de-DE")}`:seit;
     h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}${istJahr(p)?` <span class="pill">${rh(p)}</span>`:""}<span class="sub2">${istJahr(p)?`<b>${eur(jahr(per,"gesamt"),2)} im Jahr</b>${faelligTxt(p)?` (fällig ${faelligTxt(p)})`:""} · `:""}${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}${p.notiz?` · ${p.notiz}`:""}</span></td><td>${p.anbieter||""}</td>
-      <td class="n">${eur(per.andre,2)}</td><td class="n">${eur(per.claudi,2)}</td><td class="n">${per.mutti?eur(per.mutti,2):""}</td><td class="n">${eur(per.gesamt,2)}</td><td class="n">${eur(bisher(p,m))}</td>
+      <td class="n">${eur(per.andre,2)}</td><td class="n">${eur(per.claudi,2)}</td><td class="n">${per.mutti?eur(per.mutti,2):""}</td><td class="n">${eur(per.gesamt,2)}</td><td class="n">${istJahr(p)?`<b>${eur(jahr(per,"gesamt"),2)}</b>`:eur(per.gesamt*12)}</td><td class="n">${eur(bisher(p,m))}</td>
       <td class="n act">${beendet?"":`<button class="btn-s" onclick="openEdit('${p.id}')" aria-label="${p.posten} ändern">✎</button>`}</td></tr>`});
   $("#tFix").innerHTML=h+"</tbody>";labelTable($("#tFix"));
   const log=(D.fixkosten?.aenderungen||[]).slice(-30);
