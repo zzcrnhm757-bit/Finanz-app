@@ -268,6 +268,7 @@ dialog select,dialog input,dialog textarea{width:100%}
   <section id="tab-konto" class="hidden">
     <p class="hint" id="hintKonto" style="margin:0 0 10px"></p>
     <div class="kpis" id="kpisKonto"></div>
+    <div class="card full hidden" id="cardAp" style="margin-bottom:12px"><h2>Apple Pay – noch nicht im Kontoauszug</h2><p class="hint" id="hintAp"></p><div class="tablewrap"><table id="tAp" class="resp"></table></div></div>
     <div class="grid2">
       <div class="card"><h2>Rein und raus – letzte 12 Monate</h2><p class="hint">Einnahmen gegen Ausgaben vom Girokonto, ohne Umbuchungen auf eigene Konten</p><div class="legend" id="legKonto"></div><div class="chart"><canvas id="cKonto"></canvas></div></div>
       <div class="card"><h2>Eigene Ausgaben nach Kategorie</h2><p class="hint" id="hintKontoKat"></p><div class="donut"><div class="chart"><canvas id="cKontoKat"></canvas></div><ul class="dleg" id="legKontoKat"></ul></div></div>
@@ -345,7 +346,7 @@ dialog select,dialog input,dialog textarea{width:100%}
 </dialog>
 
 <script>
-const FILES=["fixkosten","splitwise","laden","km","splitwise_variabel","konto_andre","konto_zuordnung"];const OPTIONAL=["km","splitwise_variabel","konto_andre","konto_zuordnung"];
+const FILES=["fixkosten","splitwise","laden","km","splitwise_variabel","konto_andre","konto_zuordnung","applepay"];const OPTIONAL=["km","splitwise_variabel","konto_andre","konto_zuordnung","applepay"];
 const PROV=["IONITY","L-Strom.drive","E.ON Drive","BMW Charging","Sonstige"];
 const $=s=>document.querySelector(s);
 const eur=(v,d=0)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:d,maximumFractionDigits:d});
@@ -825,7 +826,7 @@ const KB=[["Einnahme","Einnahmen","--good"],["Fixkosten","Fixkosten","--s1"],["L
 const kBer=x=>x.bereich==="Ausgabe"&&x.splitwise?"Splitwise":x.bereich;
 let kFilter="alle";
 function kSum(m,b){return kRows().filter(x=>ym(x.datum)===m&&kBer(x)===b).reduce((s,x)=>s+x.betrag,0)}
-function rKonto(m){
+function rKonto(m){rAp();
   if(!kRows().length){$("#kpisKonto").innerHTML=kpi("Andres Konto","–","Noch keine Kontoauszüge eingelesen.");return}
   const ms=[...new Set(kRows().map(x=>ym(x.datum)))].sort(),bis=ms.at(-1);
   const lk=(D.konto_andre.luecken||[]).length?` · ⚠︎ Auszug fehlt ${D.konto_andre.luecken.join(", ")}`:"";
@@ -981,7 +982,17 @@ function openUew(art){const n=art==="ruecklage"?"Rücklagekonto (jährliche Beit
 let zuId=null,zuId_gesperrt=false;
 const zuSync=()=>{const g=document.querySelector('input[name=zuWer]:checked').value==="gemeinsam";document.querySelectorAll("#dlgZu .f-gem").forEach(e=>e.classList.toggle("hidden",!g))};
 document.querySelectorAll('input[name=zuWer]').forEach(r=>r.onchange=zuSync);
-function openZu(id){const x=kRows().find(b=>b.id===id);if(!x)return;zuId=id;const o=x.zu||{};$("#zuErr").textContent="";
+const apAlle=()=>D.applepay&&!D.applepay.error?D.applepay.eintraege||[]:[];
+function apPseudo(e){const o=ZU()["ap:"+e.id];const x={id:"ap:"+e.id,datum:e.datum.slice(0,10),betrag:-e.betrag,empfaenger:e.haendler||"Apple Pay",bereich:"Ausgabe",kategorie:o?.kategorie||"Apple Pay (noch offen)",zweck:e.karte?`Apple Pay · ${e.karte}`:"Apple Pay"};
+  if(o){x.zu=o;if(o.gemeinsam)x.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(e.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id}}return x}
+const zuFind=id=>id.startsWith("ap:")?(e=>e&&apPseudo(e))(apAlle().find(e=>"ap:"+e.id===id)):kRows().find(b=>b.id===id);
+function rAp(){const m=$("#month").value,imKonto=new Set((D.konto_andre?.buchungen||[]).filter(b=>b.applepay).map(b=>b.applepay.id));
+  const rows=apAlle().filter(e=>!imKonto.has(e.id)&&e.datum.startsWith(m)).map(apPseudo).reverse();
+  $("#cardAp").classList.toggle("hidden",!rows.length||person==="claudia");if(!rows.length)return;
+  const sum=rows.reduce((s,x)=>s-x.betrag,0),gem=rows.filter(x=>x.zu?.gemeinsam).length;
+  $("#hintAp").textContent=`${monthName(m)} · ${rows.length} Zahlungen, ${eur(sum,2)} · per Kurzbefehl erfasst${gem?` · ${gem} gemeinsam`:""} · ✎ zum Zuordnen – mit dem Kontoauszug werden sie übernommen`;
+  $("#tAp").innerHTML=`<thead><tr><th>Zahlung</th><th>Kategorie</th><th class="n">Betrag</th></tr></thead><tbody>`+rows.map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · ${x.zweck}${x.splitwise?` · ${x.splitwise.geplant?"wird in Splitwise eingetragen":"in Splitwise"} (${x.splitwise.gruppe})`:""}</span></td><td>${x.kategorie}</td><td class="n">${eur(x.betrag,2)} <button class="btn-s" style="margin-left:6px" onclick="openZu('${x.id}')" aria-label="Zuordnen">${x.zu?.gemeinsam?"👥":"✎"}</button></td></tr>`).join("")+"</tbody>";labelTable($("#tAp"))}
+function openZu(id){const x=zuFind(id);if(!x)return;zuId=id;const o=x.zu||{};$("#zuErr").textContent="";
   const gesperrt=o.splitwise_id||(x.splitwise&&!x.splitwise.geplant);
   $("#zuInfo").textContent=`${x.empfaenger} · ${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")} · ${eur(-x.betrag,2)}`+(gesperrt?` · steht schon in Splitwise (${x.splitwise?.gruppe||o.gruppe}) – Änderungen bitte dort; Kategorie hier änderbar`:"");
   const grp=[...new Set((D.splitwise_variabel?.gruppen||[]).filter(g=>g.mit_claudia).map(g=>g.name))];
@@ -989,9 +1000,9 @@ function openZu(id){const x=kRows().find(b=>b.id===id);if(!x)return;zuId=id;cons
   $("#zuKatList").innerHTML=[...new Set((D.konto_andre?.buchungen||[]).map(b=>b.kategorie.replace(" (Erstattung)","")))].sort().map(k=>`<option value="${k}">`).join("");
   document.querySelector(`input[name=zuWer][value=${o.gemeinsam?"gemeinsam":"ich"}]`).checked=true;
   $("#zuGruppe").value=o.gruppe||grp.find(g=>/lebensmittel/i.test(g))||grp[0]||"";$("#zuAnteil").value=String(o.anteil_claudia??0.5);
-  $("#zuKat").value=x.kategorie.replace(" (Erstattung)","");$("#zuText").value=o.beschreibung||x.empfaenger.replace(/^PayPal · /,"").replace(/^Kartenzahlung /,"");
+  $("#zuKat").value=x.kategorie.startsWith("Apple Pay (")?"":x.kategorie.replace(" (Erstattung)","");$("#zuText").value=o.beschreibung||x.empfaenger.replace(/^PayPal · /,"").replace(/^Kartenzahlung /,"");
   document.querySelectorAll("#dlgZu input[name=zuWer],#dlgZu select,#zuText").forEach(e=>e.disabled=!!gesperrt);zuId_gesperrt=!!gesperrt;zuSync();dlgZu.showModal()}
-async function saveZu(){const x=(D.konto_andre?.buchungen||[]).find(b=>b.id===zuId);const gem=!zuId_gesperrt&&document.querySelector('input[name=zuWer]:checked').value==="gemeinsam";
+async function saveZu(){const x0=zuFind(zuId),x=zuId.startsWith("ap:")?{...x0,kategorie:x0.zu?.kategorie||""}:(D.konto_andre?.buchungen||[]).find(b=>b.id===zuId);const gem=!zuId_gesperrt&&document.querySelector('input[name=zuWer]:checked').value==="gemeinsam";
   const kat=$("#zuKat").value.trim();$("#zuSave").disabled=true;$("#zuErr").textContent="Speichere …";
   try{await commitData("konto_zuordnung",data=>{data.buchungen=data.buchungen||{};const alt=data.buchungen[zuId]||{};
       const o={...alt,datum:x.kaufdatum||x.datum,betrag:-x.betrag,empfaenger:x.empfaenger,gemeinsam:gem,zeit:new Date().toISOString().slice(0,16)};
