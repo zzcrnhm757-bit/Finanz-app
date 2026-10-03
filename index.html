@@ -162,7 +162,7 @@ dialog select,dialog input,dialog textarea{width:100%}
 <main>
   <div id="lock" class="card empty hidden" style="text-align:center;padding:48px 20px">
     <div style="font-size:44px;line-height:1">🔒</div><p><strong>Haushalt ist gesperrt</strong></p>
-    <button class="primary" onclick="entsperren()" style="font-size:16px;padding:12px 22px">Mit Face ID entsperren</button>
+    <button class="primary" onclick="entsperren(false)" style="font-size:16px;padding:12px 22px">Mit Face ID entsperren</button>
     <p class="note" id="lockMsg" style="color:var(--bad)"></p></div>
   <div id="empty" class="card empty hidden">
     <p><strong>Noch keine Daten verbunden.</strong></p>
@@ -389,15 +389,17 @@ async function faceIdEinrichten(){const c=rawCfg();const msg=t=>$("#faceMsg").te
     entsperrt=true;faceStatus();msg(l.mode==="prf"?"Face ID ist aktiv – der Schlüssel ist jetzt verschlüsselt gespeichert.":"Face ID ist als Sperre aktiv (dieses Gerät kann den Schlüssel nicht verschlüsseln).")}
   catch(e){msg(e.name==="NotAllowedError"?"Abgebrochen.":"Fehler: "+e.message)}}
 function faceIdAus(){if(!entsperrt)return;const c=cfg();localStorage.setItem("finanzCfg",JSON.stringify(c));localStorage.removeItem("finanzLock");memCfg=null;faceStatus();$("#faceMsg").textContent="Face ID ist aus. Den Passkey „Haushalt“ kannst du in den iPhone-Einstellungen › Passwörter löschen."}
-async function entsperren(){const l=lockInfo();if(!l)return;$("#lockMsg").textContent="";
+let entsperrtLaeuft=false;
+async function entsperren(auto){const l=lockInfo();if(!l||entsperrtLaeuft)return;$("#lockMsg").textContent="";entsperrtLaeuft=true;
   try{const sec=await passkeyGet(l);
     if(l.mode==="prf"){if(!sec)throw new Error("Der Passkey hat keinen Schlüssel geliefert.");const key=await prfKey(sec);
       const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64u.dec(l.iv)},key,b64u.dec(l.ct));memCfg={...rawCfg(),token:new TextDecoder().decode(pt)}}
     entsperrt=true;$("#lock").classList.add("hidden");document.body.classList.remove("gesperrt");load()}
-  catch(e){$("#lockMsg").textContent=e.name==="NotAllowedError"?"Abgebrochen – noch einmal tippen.":"Entsperren fehlgeschlagen: "+e.message}}
+  catch(e){if(!auto)$("#lockMsg").textContent=e.name==="NotAllowedError"?"Abgebrochen – noch einmal tippen.":"Entsperren fehlgeschlagen: "+e.message}
+  finally{entsperrtLaeuft=false}}
 function sperren(){if(!lockInfo())return;memCfg=null;entsperrt=false;D={};Object.values(charts).forEach(c=>c.destroy());charts={};
   document.body.classList.add("gesperrt");$("#lock").classList.remove("hidden")}
-let versteckt=0;document.addEventListener("visibilitychange",()=>{if(document.hidden)versteckt=Date.now();else if(lockInfo()&&entsperrt&&Date.now()-versteckt>5*60e3)sperren()});
+let versteckt=0;document.addEventListener("visibilitychange",()=>{if(document.hidden)versteckt=Date.now();else if(lockInfo()&&entsperrt&&Date.now()-versteckt>5*60e3){sperren();entsperren(true)}});
 function faceStatus(){const l=lockInfo();$("#faceState").textContent=l?(l.mode==="prf"?"aktiv (Schlüssel verschlüsselt)":"aktiv (als Sperre)"):"aus";
   $("#btnFaceAn").classList.toggle("hidden",!!l);$("#btnFaceAus").classList.toggle("hidden",!l)}
 function openSettings(){const c=cfg(),l=lockInfo();fOwner.value=c.owner||"zzcrnhm757-bit";fRepo.value=c.repo||"Finanzdaten";fToken.value=l?"":(c.token||"");
@@ -1076,7 +1078,7 @@ document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{person=b.data
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;if(/^\d{4}$/.test($("#month").value)){const y=$("#month").value,opts=[...$("#month").options].map(o=>o.value).filter(v=>v.startsWith(y+"-"));$("#month").value=opts[0]}document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));b.scrollIntoView({block:"nearest",inline:"center"});
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hidden",s.id!=="tab-"+tab));render()});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
-if(lockInfo()){document.body.classList.add("gesperrt");$("#lock").classList.remove("hidden");if(lockInfo().mode==="gate")entsperrt=false}else load();
+if(lockInfo()){document.body.classList.add("gesperrt");$("#lock").classList.remove("hidden");entsperren(true)}else load(); // Face ID startet direkt; klappt das nicht (z. B. Safari verlangt einen Tipp), bleibt der Knopf
 </script>
 </body>
 </html>
