@@ -818,7 +818,7 @@ function rVar(m){rBudget(m);
 
 /* ---------- Andres Girokonto (Kontoauszüge) ---------- */
 const ZU=()=>D.konto_zuordnung&&!D.konto_zuordnung.error?D.konto_zuordnung.buchungen||{}:{};
-const kRows=()=>{const z=ZU();return (D.konto_andre?.buchungen||[]).map(x=>{const o=z[x.id];if(!o)return x;const y={...x,zu:o};
+const kRows=()=>{const z=ZU();return (D.konto_andre?.buchungen||[]).map(x=>{const o=z[x.id]||(x.applepay&&z["ap:"+x.applepay.id]);if(!o)return x;const y={...x,zu:o};
   if(o.kategorie)y.kategorie=o.kategorie;
   if(o.gemeinsam&&!x.splitwise&&x.betrag<0)y.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(-x.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id};
   return y})};
@@ -992,7 +992,7 @@ function rAp(){const m=$("#month").value,imKonto=new Set((D.konto_andre?.buchung
   const sum=rows.reduce((s,x)=>s-x.betrag,0),gem=rows.filter(x=>x.zu?.gemeinsam).length;
   $("#hintAp").textContent=`${monthName(m)} · ${rows.length} Zahlungen, ${eur(sum,2)} · per Kurzbefehl erfasst${gem?` · ${gem} gemeinsam`:""} · ✎ zum Zuordnen – mit dem Kontoauszug werden sie übernommen`;
   $("#tAp").innerHTML=`<thead><tr><th>Zahlung</th><th>Kategorie</th><th class="n">Betrag</th></tr></thead><tbody>`+rows.map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · ${x.zweck}${x.splitwise?` · ${x.splitwise.geplant?"wird in Splitwise eingetragen":"in Splitwise"} (${x.splitwise.gruppe})`:""}</span></td><td>${x.kategorie}</td><td class="n">${eur(x.betrag,2)} <button class="btn-s" style="margin-left:6px" onclick="openZu('${x.id}')" aria-label="Zuordnen">${x.zu?.gemeinsam?"👥":"✎"}</button></td></tr>`).join("")+"</tbody>";labelTable($("#tAp"))}
-function openZu(id){const x=zuFind(id);if(!x)return;zuId=id;const o=x.zu||{};$("#zuErr").textContent="";
+function openZu(id){{const k=!id.startsWith("ap:")&&(D.konto_andre?.buchungen||[]).find(b=>b.id===id);if(k?.applepay&&ZU()["ap:"+k.applepay.id]&&apAlle().some(e=>e.id===k.applepay.id))id="ap:"+k.applepay.id}const x=zuFind(id);if(!x)return;zuId=id;const o=x.zu||{};$("#zuErr").textContent="";
   const gesperrt=o.splitwise_id||(x.splitwise&&!x.splitwise.geplant);
   $("#zuInfo").textContent=`${x.empfaenger} · ${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")} · ${eur(-x.betrag,2)}`+(gesperrt?` · steht schon in Splitwise (${x.splitwise?.gruppe||o.gruppe}) – Änderungen bitte dort; Kategorie hier änderbar`:"");
   const grp=[...new Set((D.splitwise_variabel?.gruppen||[]).filter(g=>g.mit_claudia).map(g=>g.name))];
