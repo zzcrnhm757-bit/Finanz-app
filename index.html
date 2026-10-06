@@ -255,6 +255,7 @@ dialog select,dialog input,dialog textarea{width:100%}
   <section id="tab-laden" class="hidden">
     <div class="kpis" id="kpisLaden"></div>
     <div class="card full hidden" id="cardBord"><h2>Verbrauch laut Bordcomputer</h2><p class="hint" id="hintBord"></p><div class="kpis" id="kpisBord" style="margin:0"></div></div>
+    <div class="card full hidden" id="cardThg" style="margin-top:12px"><h2>THG-Prämie (carbonify)</h2><p class="hint" id="hintThg"></p><div class="tablewrap"><table id="tThg" class="resp"></table></div></div>
     <div class="grid2">
       <div class="card"><h2>Ladekosten pro Monat</h2><p class="hint">Nach Anbieter, laut Rechnungen</p><div class="legend" id="legLaden"></div><div class="chart"><canvas id="cLaden"></canvas></div></div>
       <div class="card"><h2>Preis pro kWh</h2><p class="hint">Durchschnitt je Anbieter, letzte 12 Monate</p><div class="tablewrap"><table id="tAnb" class="resp"></table></div></div>
@@ -346,7 +347,7 @@ dialog select,dialog input,dialog textarea{width:100%}
 </dialog>
 
 <script>
-const FILES=["fixkosten","splitwise","laden","km","splitwise_variabel","konto_andre","konto_zuordnung","applepay"];const OPTIONAL=["km","splitwise_variabel","konto_andre","konto_zuordnung","applepay"];
+const FILES=["fixkosten","splitwise","laden","km","splitwise_variabel","konto_andre","konto_zuordnung","applepay","thg"];const OPTIONAL=["km","splitwise_variabel","konto_andre","konto_zuordnung","applepay","thg"];
 const PROV=["IONITY","L-Strom.drive","E.ON Drive","BMW Charging","Sonstige"];
 const $=s=>document.querySelector(s);
 const eur=(v,d=0)=>v==null||isNaN(v)?"–":v.toLocaleString("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:d,maximumFractionDigits:d});
@@ -589,7 +590,7 @@ function rLaden(m){
   const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${eur(km100.kosten)} auf ${km100.km.toLocaleString("de-DE")} km · ${km100.text}`+(km100.r12?` · letzte 12 Monate ${num(km100.r12,2)} €`:"")):"";
   $("#kpisLaden").innerHTML=kpi("Ladekosten",eur(ladenPerson(e),2),monthName(m)+(person!=="alle"?" · dein Anteil":""))+kpi("Geladen",num(kwh)+" kWh",`${rows.length} Ladevorgänge`)+
     kpi("Ø Preis",kwh?num(eK/kwh,3)+" €/kWh":"–","Vorgänge mit kWh-Angabe")+kmKpi+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
-  rBord();
+  rBord();rThg();
   const L=last12(m);const cols=["--s1","--s2","--s3","--s4","--s5"];
   $("#legLaden").innerHTML=PROV.map((p,i)=>`<span><i style="background:var(${cols[i]})"></i>${p}</span>`).join("");
   mkChart("cLaden",{type:"bar",data:{labels:L.map(monthShort),datasets:PROV.map((p,i)=>({label:p,
@@ -909,6 +910,20 @@ function rRb(m){
   $("#tRb").innerHTML=h+"</tbody>";labelTable($("#tRb"))}
 
 
+
+/* ---------- THG-Prämie ---------- */
+const thgAlle=()=>D.thg&&!D.thg.error?D.thg.auszahlungen||[]:[];
+function rThg(){const A=thgAlle();$("#cardThg").classList.toggle("hidden",!A.length);if(!A.length)return;
+  const lk=y=>ladenRows().filter(x=>x.datum.startsWith(String(y))).reduce((s,x)=>s+(x.betrag||0),0);
+  const sum=A.reduce((s,a)=>s+(a.betrag||0),0),offen=A.filter(a=>a.betrag==null);
+  $("#hintThg").textContent=`Bisher ${eur(sum,2)} ausgezahlt · zählt auf Andres Konto als Einnahme · Netto = Ladekosten des Jahres (gesamt) minus Prämie`+(offen.length?` · ✎ Betrag für ${offen.map(a=>a.quotenjahr).join(", ")} fehlt`:"");
+  let t=`<thead><tr><th>Quotenjahr</th><th class="n">Prämie</th><th class="n">Ladekosten</th><th class="n">Netto</th></tr></thead><tbody>`;
+  A.forEach((a,i)=>{const L=lk(a.quotenjahr);t+=`<tr${a.betrag==null?` style="cursor:pointer" onclick="openThg(${i})"`:""}><td>${a.quotenjahr}<span class="sub2">ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")} · ${a.anbieter||""}${a.konto_id?" · ✓ Konto":""}</span></td>`+
+    `<td class="n">${a.betrag==null?"✎ fehlt":"+"+eur(a.betrag,2)}</td><td class="n">${L?eur(L,2):"–"}</td><td class="n"><b>${L?eur(L-(a.betrag||0),2):"–"}</b></td></tr>`});
+  $("#tThg").innerHTML=t+`<tr><td><b>Summe</b></td><td class="n"><b>+${eur(sum,2)}</b></td><td></td><td></td></tr></tbody>`;labelTable($("#tThg"))}
+async function openThg(i){const a=thgAlle()[i];const v=prompt(`THG-Prämie Quotenjahr ${a.quotenjahr} (ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")}) – Betrag in €:`);if(v==null)return;
+  const b=+String(v).replace(/[^\d,.]/g,"").replace(",",".");if(!(b>0))return;
+  try{await commitData("thg",d=>{const x=d.auszahlungen.find(z=>z.quotenjahr===a.quotenjahr&&z.datum===a.datum);x.betrag=b;x.quelle=(x.quelle||"")+" · Betrag in der App eingetragen";return `THG-Prämie ${a.quotenjahr}: ${eur(b,2)}`},{auszahlungen:[]});render()}catch(e){alert(e.message)}}
 
 function rBord(){
   const b=(D.km?.bordcomputer||[]).at(-1);$("#cardBord").classList.toggle("hidden",!b);if(!b)return;
