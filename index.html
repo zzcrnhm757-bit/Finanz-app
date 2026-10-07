@@ -208,6 +208,8 @@ dialog select,dialog input,dialog textarea{width:100%}
       <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „pro Jahr“ = Jahresbetrag (fett = tatsächlicher Jahresbeitrag) · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
       <input type="search" id="qFix" placeholder="Posten suchen (Name, Anbieter, Kategorie)" style="width:100%;margin-bottom:8px">
       <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
+    <div class="card full" id="cardEinz"><div class="toolbar"><h2>Einnahmen ohne Kontoauszug</h2><button class="btn-s" onclick="openEinz()">+ Einzahlung</button></div>
+      <p class="hint" id="hintEinz"></p><div class="tablewrap"><table id="tEinz" class="resp"></table></div></div>
     <p class="note">Regines Anteile (Spalte „Regine“) werden mit ihrem Darlehen verrechnet – Details im Tab „Darlehen Regine“.</p>
     <div class="card full"><h2>Änderungsprotokoll</h2><p class="hint">Neueste zuerst</p><ol class="log" id="logFix" reversed></ol></div>
   </section>
@@ -254,8 +256,8 @@ dialog select,dialog input,dialog textarea{width:100%}
 
   <section id="tab-laden" class="hidden">
     <div class="kpis" id="kpisLaden"></div>
+    <div class="card hidden" id="boxThg" style="max-width:460px;margin:0 0 12px"><h2 style="font-size:14px">THG-Prämie (carbonify)</h2><p class="hint" id="hintThg"></p><div class="tablewrap"><table id="tThg" class="resp"></table></div></div>
     <div class="card full hidden" id="cardBord"><h2>Verbrauch laut Bordcomputer</h2><p class="hint" id="hintBord"></p><div class="kpis" id="kpisBord" style="margin:0"></div></div>
-    <div class="card full hidden" id="cardThg" style="margin-top:12px"><h2>THG-Prämie (carbonify)</h2><p class="hint" id="hintThg"></p><div class="tablewrap"><table id="tThg" class="resp"></table></div></div>
     <div class="grid2">
       <div class="card"><h2>Ladekosten pro Monat</h2><p class="hint">Nach Anbieter, laut Rechnungen</p><div class="legend" id="legLaden"></div><div class="chart"><canvas id="cLaden"></canvas></div></div>
       <div class="card"><h2>Preis pro kWh</h2><p class="hint">Durchschnitt je Anbieter, letzte 12 Monate</p><div class="tablewrap"><table id="tAnb" class="resp"></table></div></div>
@@ -300,6 +302,19 @@ dialog select,dialog input,dialog textarea{width:100%}
   </div>
 </dialog>
 
+<dialog id="dlgEinz">
+  <h2 style="margin:0 0 4px;font-size:17px" id="einzTitel">Einzahlung eintragen</h2>
+  <p class="note" style="margin-top:0">Bargeld oder andere Einnahmen, die nicht auf dem Kontoauszug stehen. Zählt als Einnahme von Andre im gewählten Monat.</p>
+  <div class="form">
+    <div><label for="einzDatum">Datum</label><input type="date" id="einzDatum"></div>
+    <div><label for="einzBetrag">Betrag (€)</label><input id="einzBetrag" inputmode="decimal" placeholder="300,00"></div>
+    <div class="w2"><label for="einzText">Beschreibung</label><input id="einzText" placeholder="z. B. Fahrrad verkauft"></div>
+    <div class="w2"><label for="einzKat">Kategorie</label><input id="einzKat" list="einzKatList" placeholder="Verkauf"></div>
+  </div>
+  <datalist id="einzKatList"><option value="Verkauf"><option value="Geschenk"><option value="Erstattung"><option value="Sonstige Einnahme"></datalist>
+  <p class="note" id="einzErr" style="color:var(--bad)"></p>
+  <div class="row"><button id="einzDel" style="margin-right:auto;color:var(--bad)" onclick="saveEinz(true)">Löschen</button><button onclick="dlgEinz.close()">Abbrechen</button><button class="primary" id="einzSave" onclick="saveEinz()">Speichern</button></div>
+</dialog>
 <dialog id="dlgZu">
   <h2 style="margin:0 0 4px;font-size:17px">Zahlung zuordnen</h2>
   <p class="note" style="margin-top:0" id="zuInfo"></p>
@@ -455,8 +470,9 @@ function bisher(p,m){ // angefallene Kosten dieses Postens von Beginn bis Ende d
     return s+monthsBetween(ym(x.ab),bis).length*share(x.andre,x.claudi)},0)}
 // Tabellen: Spaltennamen als data-label für die Kartenansicht am Handy
 function labelTable(t){const h=[...t.querySelectorAll("thead th")].map(x=>x.textContent);t.querySelectorAll("tbody tr").forEach(r=>[...r.children].forEach((td,i)=>{if(!td.hasAttribute("colspan"))td.dataset.label=h[i]||""}))}
-function andreKontoEin(m){const r=(D.konto_andre?.buchungen||[]).filter(x=>ym(x.datum)===m&&x.bereich==="Einnahme"&&x.kategorie!=="Familie");return r.length?r.reduce((s,x)=>s+x.betrag,0):null}
-function einnahmen(m){const e=D.fixkosten?.einnahmen||{};const k=m?andreKontoEin(m):null;const a=k??((e.andre_netto||0)+(e.mieteinnahme||0)),c=e.claudi_netto||0;return share(a,c)}
+const barEin=m=>einzAlle().filter(e=>ym(e.datum)===m).reduce((s,e)=>s+e.betrag,0);
+function andreKontoEin(m){const r=(D.konto_andre?.buchungen||[]).filter(x=>ym(x.datum)===m&&x.bereich==="Einnahme"&&x.kategorie!=="Familie");return r.length?r.reduce((s,x)=>s+x.betrag,0)+barEin(m):null}
+function einnahmen(m){const e=D.fixkosten?.einnahmen||{};const k=m?andreKontoEin(m):null;const a=k??((e.andre_netto||0)+(e.mieteinnahme||0)+(m?barEin(m):0)),c=e.claudi_netto||0;return share(a,c)}
 const swRows=()=>(D.splitwise?.eintraege||[]);
 const ladenRows=()=>(D.laden?.vorgaenge||[]);
 // Anteil Andre an Ladekosten = Verhältnis der Splitwise-Ladebuchungen der letzten 12 Monate
@@ -528,7 +544,7 @@ function rUeb(m){rUew(m);
     {label:"Sonstiges Auto",data:L.map(k=>swMonat(k,"Ausgabe")),backgroundColor:css("--s2"),borderRadius:{topLeft:4,topRight:4},borderSkipped:"bottom"}]},options:baseOpts()});
 }
 
-function rFix(m){
+function rFix(m){rEinz(m);
   const akt=fixAktiv(m),tot=fixTotal(m),L=last12(m),vm=L[L.length-2],vj=addM(m,-12);
   const d1=tot-fixTotal(vm),d12=tot-fixTotal(vj);
   const st0=fixStart();const vor=k=>!st0||k<st0;
@@ -589,7 +605,7 @@ function rLaden(m){
   const km100=kmPer100(m);
   const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${eur(km100.kosten)} auf ${km100.km.toLocaleString("de-DE")} km · ${km100.text}`+(km100.r12?` · letzte 12 Monate ${num(km100.r12,2)} €`:"")):"";
   $("#kpisLaden").innerHTML=kpi("Ladekosten",eur(ladenPerson(e),2),monthName(m)+(person!=="alle"?" · dein Anteil":""))+kpi("Geladen",num(kwh)+" kWh",`${rows.length} Ladevorgänge`)+
-    kpi("Ø Preis",kwh?num(eK/kwh,3)+" €/kWh":"–","Vorgänge mit kWh-Angabe")+kmKpi+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
+    kpi("Ø Preis",kwh?num(eK/kwh,3)+" €/kWh":"–","Vorgänge mit kWh-Angabe")+kmKpi+thgKpi(m)+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
   rBord();rThg();
   const L=last12(m);const cols=["--s1","--s2","--s3","--s4","--s5"];
   $("#legLaden").innerHTML=PROV.map((p,i)=>`<span><i style="background:var(${cols[i]})"></i>${p}</span>`).join("");
@@ -819,7 +835,9 @@ function rVar(m){rBudget(m);
 
 /* ---------- Andres Girokonto (Kontoauszüge) ---------- */
 const ZU=()=>D.konto_zuordnung&&!D.konto_zuordnung.error?D.konto_zuordnung.buchungen||{}:{};
-const kRows=()=>{const z=ZU();return (D.konto_andre?.buchungen||[]).map(x=>{const o=z[x.id]||(x.applepay&&z["ap:"+x.applepay.id]);if(!o)return x;const y={...x,zu:o};
+const einzAlle=()=>D.fixkosten?.einzahlungen||[];
+const barRows=()=>einzAlle().map(e=>({id:"bar:"+e.id,datum:e.datum,betrag:e.betrag,empfaenger:e.text||"Bareinnahme",bereich:"Einnahme",kategorie:e.kategorie||"Bareinnahme",zweck:"bar / ohne Konto – von Hand eingetragen",bar:true}));
+const kRows=()=>{const z=ZU();return (D.konto_andre?.buchungen||[]).concat(barRows()).map(x=>{const o=z[x.id]||(x.applepay&&z["ap:"+x.applepay.id]);if(!o)return x;const y={...x,zu:o};
   if(o.kategorie)y.kategorie=o.kategorie;
   if(o.gemeinsam&&!x.splitwise&&x.betrag<0)y.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(-x.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id};
   return y})};
@@ -912,18 +930,23 @@ function rRb(m){
 
 
 /* ---------- THG-Prämie ---------- */
+// Die Prämie eines Quotenjahres wird erst im Folgejahr gutgeschrieben (Quote 2025 → mindert die Ladekosten 2026).
 const thgAlle=()=>D.thg&&!D.thg.error?D.thg.auszahlungen||[]:[];
-function rThg(){const A=thgAlle();$("#cardThg").classList.toggle("hidden",!A.length);if(!A.length)return;
+const thgFuer=y=>thgAlle().find(a=>a.quotenjahr+1===+y);
+function thgKpi(m){const A=thgAlle();if(!A.length)return "";const y=m.slice(0,4),a=thgFuer(y);
+  const L=ladenRows().filter(x=>x.datum.startsWith(y)).reduce((s,x)=>s+(x.betrag||0),0);
+  return kpi("THG-Prämie "+y,a?(a.betrag==null?"fehlt":"+"+eur(a.betrag,2)):"–",a?`Quote ${a.quotenjahr} · Ladekosten ${y} netto ${eur(L-(a.betrag||0),2)}`:"für "+y+" noch keine Prämie","pos","#boxThg")}
+function rThg(){const A=thgAlle();setTimeout(syncOpen);if(!A.length)return;
   const lk=y=>ladenRows().filter(x=>x.datum.startsWith(String(y))).reduce((s,x)=>s+(x.betrag||0),0);
-  const sum=A.reduce((s,a)=>s+(a.betrag||0),0),offen=A.filter(a=>a.betrag==null);
-  $("#hintThg").textContent=`Bisher ${eur(sum,2)} ausgezahlt · zählt auf Andres Konto als Einnahme · Netto = Ladekosten des Jahres (gesamt) minus Prämie`+(offen.length?` · ✎ Betrag für ${offen.map(a=>a.quotenjahr).join(", ")} fehlt`:"");
-  let t=`<thead><tr><th>Quotenjahr</th><th class="n">Prämie</th><th class="n">Ladekosten</th><th class="n">Netto</th></tr></thead><tbody>`;
-  A.forEach((a,i)=>{const L=lk(a.quotenjahr);t+=`<tr${a.betrag==null?` style="cursor:pointer" onclick="openThg(${i})"`:""}><td>${a.quotenjahr}<span class="sub2">ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")} · ${a.anbieter||""}${a.konto_id?" · ✓ Konto":""}</span></td>`+
-    `<td class="n">${a.betrag==null?"✎ fehlt":"+"+eur(a.betrag,2)}</td><td class="n">${L?eur(L,2):"–"}</td><td class="n"><b>${L?eur(L-(a.betrag||0),2):"–"}</b></td></tr>`});
-  $("#tThg").innerHTML=t+`<tr><td><b>Summe</b></td><td class="n"><b>+${eur(sum,2)}</b></td><td></td><td></td></tr></tbody>`;labelTable($("#tThg"))}
-async function openThg(i){const a=thgAlle()[i];const v=prompt(`THG-Prämie Quotenjahr ${a.quotenjahr} (ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")}) – Betrag in €:`);if(v==null)return;
+  const sum=A.reduce((s,a)=>s+(a.betrag||0),0),offenT=A.filter(a=>a.betrag==null);
+  $("#hintThg").textContent=`Gutschrift jeweils im Folgejahr des Quotenjahres · bisher ${eur(sum,2)} erhalten`+(offenT.length?` · ✎ Betrag Quote ${offenT.map(a=>a.quotenjahr).join(", ")} fehlt`:"");
+  let t=`<thead><tr><th>Gutgeschrieben</th><th class="n">Prämie</th><th class="n">Ladekosten netto</th></tr></thead><tbody>`;
+  [...A].reverse().forEach(a=>{const y=a.quotenjahr+1,L=lk(y),i=A.indexOf(a);t+=`<tr${a.betrag==null?` style="cursor:pointer" onclick="openThg(${i})"`:""}><td>${y}<span class="sub2">Quote ${a.quotenjahr} · ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")}</span></td>`+
+    `<td class="n">${a.betrag==null?"✎ fehlt":"+"+eur(a.betrag,2)}</td><td class="n">${L?`<b>${eur(L-(a.betrag||0),2)}</b><span class="sub2">von ${eur(L,2)}</span>`:"noch keine"}</td></tr>`});
+  $("#tThg").innerHTML=t+"</tbody>";labelTable($("#tThg"))}
+async function openThg(i){const a=thgAlle()[i];const v=prompt(`THG-Prämie Quote ${a.quotenjahr} (ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")}) – Betrag in €:`);if(v==null)return;
   const b=+String(v).replace(/[^\d,.]/g,"").replace(",",".");if(!(b>0))return;
-  try{await commitData("thg",d=>{const x=d.auszahlungen.find(z=>z.quotenjahr===a.quotenjahr&&z.datum===a.datum);x.betrag=b;x.quelle=(x.quelle||"")+" · Betrag in der App eingetragen";return `THG-Prämie ${a.quotenjahr}: ${eur(b,2)}`},{auszahlungen:[]});render()}catch(e){alert(e.message)}}
+  try{await commitData("thg",d=>{const x=d.auszahlungen.find(z=>z.quotenjahr===a.quotenjahr&&z.datum===a.datum);x.betrag=b;x.quelle=(x.quelle||"")+" · Betrag in der App eingetragen";return `THG-Prämie Quote ${a.quotenjahr}: ${eur(b,2)}`},{auszahlungen:[]});render()}catch(e){alert(e.message)}}
 
 function rBord(){
   const b=(D.km?.bordcomputer||[]).at(-1);$("#cardBord").classList.toggle("hidden",!b);if(!b)return;
@@ -1007,7 +1030,7 @@ function rAp(){const m=$("#month").value,imKonto=new Set((D.konto_andre?.buchung
   const sum=rows.reduce((s,x)=>s-x.betrag,0),gem=rows.filter(x=>x.zu?.gemeinsam).length;
   $("#hintAp").textContent=`${rows.length} offene Zahlungen, ${eur(sum,2)} · per Kurzbefehl erfasst${gem?` · ${gem} gemeinsam`:""} · ✎ zum Zuordnen – mit dem Kontoauszug werden sie übernommen`;
   $("#tAp").innerHTML=`<thead><tr><th>Zahlung</th><th>Kategorie</th><th class="n">Betrag</th></tr></thead><tbody>`+rows.map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.datum).toLocaleDateString("de-DE")} · ${x.zweck}${x.splitwise?` · ${x.splitwise.geplant?"wird in Splitwise eingetragen":"in Splitwise"} (${x.splitwise.gruppe})`:""}</span></td><td>${x.kategorie}</td><td class="n">${eur(x.betrag,2)} <button class="btn-s" style="margin-left:6px" onclick="openZu('${x.id}')" aria-label="Zuordnen">${x.zu?.gemeinsam?"👥":"✎"}</button></td></tr>`).join("")+"</tbody>";labelTable($("#tAp"))}
-function openZu(id){{const k=!id.startsWith("ap:")&&(D.konto_andre?.buchungen||[]).find(b=>b.id===id);if(k?.applepay&&ZU()["ap:"+k.applepay.id]&&apAlle().some(e=>e.id===k.applepay.id))id="ap:"+k.applepay.id}const x=zuFind(id);if(!x)return;zuId=id;const o=x.zu||{};$("#zuErr").textContent="";
+function openZu(id){if(id.startsWith("bar:"))return openEinz(id.slice(4));{const k=!id.startsWith("ap:")&&(D.konto_andre?.buchungen||[]).find(b=>b.id===id);if(k?.applepay&&ZU()["ap:"+k.applepay.id]&&apAlle().some(e=>e.id===k.applepay.id))id="ap:"+k.applepay.id}const x=zuFind(id);if(!x)return;zuId=id;const o=x.zu||{};$("#zuErr").textContent="";
   const gesperrt=o.splitwise_id||(x.splitwise&&!x.splitwise.geplant);
   $("#zuInfo").textContent=`${x.empfaenger} · ${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")} · ${eur(-x.betrag,2)}`+(gesperrt?` · steht schon in Splitwise (${x.splitwise?.gruppe||o.gruppe}) – Änderungen bitte dort; Kategorie hier änderbar`:"");
   const grp=[...new Set((D.splitwise_variabel?.gruppen||[]).filter(g=>g.mit_claudia).map(g=>g.name))];
@@ -1027,6 +1050,29 @@ async function saveZu(){const x0=zuFind(zuId),x=zuId.startsWith("ap:")?{...x0,ka
       if(!o.gemeinsam&&!o.kategorie&&!o.splitwise_id)delete data.buchungen[zuId];else data.buchungen[zuId]=o;data.stand=new Date().toISOString().slice(0,16);
       return `Konto: ${x.empfaenger} ${eur(-x.betrag,2)} → ${zuId_gesperrt?"(steht schon in Splitwise)":gem?"gemeinsam ("+o.gruppe+")":"nur Andre"}${o.kategorie?", Kategorie "+o.kategorie:""}`},{hinweis:"Zuordnungen von Kontobuchungen aus der App (id = Buchungs-ID aus konto_andre.json)",buchungen:{}});
     dlgZu.close();render()}catch(e){$("#zuErr").textContent=e.message}finally{$("#zuSave").disabled=false}}
+
+/* ---------- Einzahlungen ohne Konto ---------- */
+let einzId=null;
+function rEinz(m){const E=einzAlle(),y=m.slice(0,4),ey=E.filter(e=>e.datum.startsWith(y));
+  $("#cardEinz").classList.toggle("hidden",person==="claudia");
+  $("#hintEinz").textContent=E.length?`${y}: ${ey.length} Einzahlung${ey.length===1?"":"en"}, ${eur(ey.reduce((s,e)=>s+e.betrag,0),2)} · zählen als Einnahme von Andre (Übersicht, Andres Konto, Jahresrückblick) · antippen zum Ändern`:"Noch keine – z. B. Bargeld aus einem Verkauf über „+ Einzahlung“ eintragen.";
+  $("#tEinz").innerHTML=E.length?`<thead><tr><th>Einnahme</th><th class="n">Betrag</th></tr></thead><tbody>`+[...E].sort((a,b)=>b.datum.localeCompare(a.datum)).map(e=>
+    `<tr style="cursor:pointer" onclick="openEinz('${e.id}')"><td>${e.text||"Bareinnahme"}<span class="sub2">${new Date(e.datum).toLocaleDateString("de-DE")} · ${e.kategorie||"Bareinnahme"}</span></td><td class="n pos">+${eur(e.betrag,2)}</td></tr>`).join("")+"</tbody>":"";
+  if(E.length)labelTable($("#tEinz"))}
+function openEinz(id){const e=id&&einzAlle().find(x=>x.id===id);einzId=e?e.id:null;$("#einzErr").textContent="";
+  $("#einzTitel").textContent=e?"Einzahlung ändern":"Einzahlung eintragen";$("#einzDel").classList.toggle("hidden",!e);
+  $("#einzDatum").value=e?.datum||new Date().toISOString().slice(0,10);$("#einzBetrag").value=e?String(e.betrag).replace(".",","):"";
+  $("#einzText").value=e?.text||"";$("#einzKat").value=e?.kategorie||"Verkauf";dlgEinz.showModal()}
+async function saveEinz(loeschen){const datum=$("#einzDatum").value,betrag=+$("#einzBetrag").value.replace(/[^\d,.]/g,"").replace(/\.(?=\d{3})/g,"").replace(",","."),text=$("#einzText").value.trim(),kat=$("#einzKat").value.trim()||"Sonstige Einnahme";
+  if(!loeschen&&(!datum||!(betrag>0))){$("#einzErr").textContent="Bitte Datum und Betrag angeben.";return}
+  if(loeschen&&!confirm("Diese Einzahlung löschen?"))return;
+  $("#einzSave").disabled=true;$("#einzErr").textContent="Speichere …";
+  try{await commitFix(f=>{f.einzahlungen=f.einzahlungen||[];
+      if(loeschen){const x=f.einzahlungen.find(z=>z.id===einzId);f.einzahlungen=f.einzahlungen.filter(z=>z.id!==einzId);return `Einzahlung gelöscht: ${x?.text||""} ${eur(x?.betrag||0,2)}`}
+      const o={id:einzId||Date.now().toString(36),datum,betrag:Math.round(betrag*100)/100,text,kategorie:kat};
+      const i=f.einzahlungen.findIndex(z=>z.id===o.id);i>=0?f.einzahlungen[i]=o:f.einzahlungen.push(o);
+      return `Einzahlung ${new Date(datum).toLocaleDateString("de-DE")}: ${text||kat} +${eur(o.betrag,2)}`});
+    dlgEinz.close();render()}catch(e){$("#einzErr").textContent=e.message}finally{$("#einzSave").disabled=false}}
 
 /* ---------- Jahresrückblick ---------- */
 function rJahr(y){
