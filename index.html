@@ -208,8 +208,6 @@ dialog select,dialog input,dialog textarea{width:100%}
       <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „pro Jahr“ = Jahresbetrag (fett = tatsächlicher Jahresbeitrag) · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
       <input type="search" id="qFix" placeholder="Posten suchen (Name, Anbieter, Kategorie)" style="width:100%;margin-bottom:8px">
       <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
-    <div class="card full" id="cardEinz"><div class="toolbar"><h2>Einnahmen ohne Kontoauszug</h2><button class="btn-s" onclick="openEinz()">+ Einzahlung</button></div>
-      <p class="hint" id="hintEinz"></p><div class="tablewrap"><table id="tEinz" class="resp"></table></div></div>
     <p class="note">Regines Anteile (Spalte „Regine“) werden mit ihrem Darlehen verrechnet – Details im Tab „Darlehen Regine“.</p>
     <div class="card full"><h2>Änderungsprotokoll</h2><p class="hint">Neueste zuerst</p><ol class="log" id="logFix" reversed></ol></div>
   </section>
@@ -271,6 +269,8 @@ dialog select,dialog input,dialog textarea{width:100%}
   <section id="tab-konto" class="hidden">
     <p class="hint" id="hintKonto" style="margin:0 0 10px"></p>
     <div class="kpis" id="kpisKonto"></div>
+    <div class="card full" id="cardEinz" style="margin-bottom:12px"><div class="toolbar"><h2>Einnahmen ohne Kontoauszug (bar)</h2><button class="btn-s" onclick="openEinz()">+ Einzahlung</button></div>
+      <p class="hint" id="hintEinz"></p><div class="tablewrap"><table id="tEinz" class="resp"></table></div></div>
     <div class="card full hidden" id="cardAp" style="margin-bottom:12px"><h2>Apple Pay – noch nicht im Kontoauszug</h2><p class="hint" id="hintAp"></p><div class="tablewrap"><table id="tAp" class="resp"></table></div></div>
     <div class="grid2">
       <div class="card"><h2>Rein und raus – letzte 12 Monate</h2><p class="hint">Einnahmen gegen Ausgaben vom Girokonto, ohne Umbuchungen auf eigene Konten</p><div class="legend" id="legKonto"></div><div class="chart"><canvas id="cKonto"></canvas></div></div>
@@ -544,7 +544,7 @@ function rUeb(m){rUew(m);
     {label:"Sonstiges Auto",data:L.map(k=>swMonat(k,"Ausgabe")),backgroundColor:css("--s2"),borderRadius:{topLeft:4,topRight:4},borderSkipped:"bottom"}]},options:baseOpts()});
 }
 
-function rFix(m){rEinz(m);
+function rFix(m){
   const akt=fixAktiv(m),tot=fixTotal(m),L=last12(m),vm=L[L.length-2],vj=addM(m,-12);
   const d1=tot-fixTotal(vm),d12=tot-fixTotal(vj);
   const st0=fixStart();const vor=k=>!st0||k<st0;
@@ -845,7 +845,7 @@ const KB=[["Einnahme","Einnahmen","--good"],["Fixkosten","Fixkosten","--s1"],["L
 const kBer=x=>x.bereich==="Ausgabe"&&x.splitwise?"Splitwise":x.bereich;
 let kFilter="alle";
 function kSum(m,b){return kRows().filter(x=>ym(x.datum)===m&&kBer(x)===b).reduce((s,x)=>s+x.betrag,0)}
-function rKonto(m){rAp();
+function rKonto(m){rAp();rEinz(m);
   if(!kRows().length){$("#kpisKonto").innerHTML=kpi("Andres Konto","–","Noch keine Kontoauszüge eingelesen.");return}
   const ms=[...new Set(kRows().map(x=>ym(x.datum)))].sort(),bis=ms.at(-1);
   const lk=(D.konto_andre.luecken||[]).length?` · ⚠︎ Auszug fehlt ${D.konto_andre.luecken.join(", ")}`:"";
