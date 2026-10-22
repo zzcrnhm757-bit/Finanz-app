@@ -930,16 +930,17 @@ function rRb(m){
 /* ---------- THG-Prämie ---------- */
 // Die Prämie eines Quotenjahres wird erst im Folgejahr gutgeschrieben (Quote 2025 → mindert die Ladekosten 2026).
 const thgAlle=()=>D.thg&&!D.thg.error?D.thg.auszahlungen||[]:[];
-const thgFuer=y=>thgAlle().find(a=>a.quotenjahr+1===+y);
+const thgJ=a=>+a.datum.slice(0,4);
+const thgFuer=y=>{const l=thgAlle().filter(a=>thgJ(a)===+y);return l.find(a=>a.betrag!=null)||l[0]};
 function thgKpi(m){const A=thgAlle();if(!A.length)return "";const y=m.slice(0,4),a=thgFuer(y);
   const L=ladenRows().filter(x=>x.datum.startsWith(y)).reduce((s,x)=>s+(x.betrag||0),0);
-  return kpi("THG-Prämie "+y,a?(a.betrag==null?"fehlt":"+"+eur(a.betrag,2)):"–",a?`Quote ${a.quotenjahr} · Ladekosten ${y} netto ${eur(L-(a.betrag||0),2)}`:"für "+y+" noch keine Prämie","pos","#boxThg")}
+  return kpi("THG-Prämie "+y,a?(a.betrag==null?"fehlt":"+"+eur(a.betrag,2)):"–",a?`ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")} · Ladekosten ${y} netto ${eur(L-(a.betrag||0),2)}`:"für "+y+" noch keine Prämie","pos","#boxThg")}
 function rThg(){const A=thgAlle();setTimeout(syncOpen);if(!A.length)return;
   const lk=y=>ladenRows().filter(x=>x.datum.startsWith(String(y))).reduce((s,x)=>s+(x.betrag||0),0);
-  const sum=A.reduce((s,a)=>s+(a.betrag||0),0),offenT=A.filter(a=>a.betrag==null);
-  $("#hintThg").textContent=`Gutschrift jeweils im Folgejahr des Quotenjahres · bisher ${eur(sum,2)} erhalten`+(offenT.length?` · ✎ Betrag Quote ${offenT.map(a=>a.quotenjahr).join(", ")} fehlt`:"");
+  const sum=A.reduce((s,a)=>s+(a.betrag||0),0),offenT=A.filter(a=>a.betrag==null&&thgFuer(thgJ(a))===a);
+  $("#hintThg").textContent=`Gutschrift im Jahr der Auszahlung · bisher ${eur(sum,2)} erhalten`+(offenT.length?` · ✎ Betrag ${offenT.map(a=>thgJ(a)).join(", ")} fehlt`:"");
   let t=`<thead><tr><th>Gutgeschrieben</th><th class="n">Prämie</th><th class="n">Ladekosten netto</th></tr></thead><tbody>`;
-  [...A].reverse().forEach(a=>{const y=a.quotenjahr+1,L=lk(y),i=A.indexOf(a);t+=`<tr${a.betrag==null?` style="cursor:pointer" onclick="openThg(${i})"`:""}><td>${y}<span class="sub2">Quote ${a.quotenjahr} · ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")}</span></td>`+
+  [...A].reverse().forEach(a=>{if(a.betrag==null&&thgFuer(thgJ(a))!==a)return;const y=thgJ(a),L=lk(y),i=A.indexOf(a);t+=`<tr${a.betrag==null?` style="cursor:pointer" onclick="openThg(${i})"`:""}><td>${y}<span class="sub2">ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")}</span></td>`+
     `<td class="n">${a.betrag==null?"✎ fehlt":"+"+eur(a.betrag,2)}</td><td class="n">${L?`<b>${eur(L-(a.betrag||0),2)}</b><span class="sub2">von ${eur(L,2)}</span>`:"noch keine"}</td></tr>`});
   $("#tThg").innerHTML=t+"</tbody>";labelTable($("#tThg"))}
 async function openThg(i){const a=thgAlle()[i];const v=prompt(`THG-Prämie Quote ${a.quotenjahr} (ausgezahlt ${new Date(a.datum).toLocaleDateString("de-DE")}) – Betrag in €:`);if(v==null)return;
