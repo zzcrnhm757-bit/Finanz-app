@@ -248,6 +248,7 @@ dialog select,dialog input,dialog textarea{width:100%}
 
   <section id="tab-laden" class="hidden">
     <div class="kpis" id="kpisLaden"></div>
+    <div class="card full" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px"><span class="hint" id="kmStand" style="margin:0;flex:1;min-width:200px"></span><button class="primary" onclick="openKm()">+ Kilometerstand</button></div>
     <div class="card full hidden" id="cardBord"><h2>Verbrauch laut Bordcomputer</h2><p class="hint" id="hintBord"></p><div class="kpis" id="kpisBord" style="margin:0"></div></div>
     <div class="grid2">
       <div class="card"><h2>Ladekosten pro Monat</h2><p class="hint">Nach Anbieter, laut Rechnungen</p><div class="legend" id="legLaden"></div><div class="chart"><canvas id="cLaden"></canvas></div></div>
@@ -301,6 +302,17 @@ dialog select,dialog input,dialog textarea{width:100%}
   </div>
 </dialog>
 
+<dialog id="dlgKm">
+  <h2 style="margin:0 0 4px;font-size:17px">Kilometerstand eintragen</h2>
+  <p class="note" style="margin-top:0">Tachostand des Autos. Fließt in €/100 km und den Jahresrückblick ein.</p>
+  <div class="form">
+    <div><label for="kmDatum">Datum</label><input type="date" id="kmDatum"></div>
+    <div><label for="kmWert">Kilometerstand</label><input id="kmWert" inputmode="numeric" placeholder="100000"></div>
+    <div class="w2"><label for="kmNotiz">Notiz (optional)</label><input id="kmNotiz" placeholder="Tacho (Andre)"></div>
+  </div>
+  <p class="note" id="kmErr" style="color:var(--bad)"></p>
+  <div class="row"><button onclick="dlgKm.close()">Abbrechen</button><button class="primary" id="kmSave" onclick="saveKm()">Speichern</button></div>
+</dialog>
 <dialog id="dlgEinz">
   <h2 style="margin:0 0 4px;font-size:17px" id="einzTitel">Einzahlung eintragen</h2>
   <p class="note" style="margin-top:0">Bargeld oder andere Einnahmen, die nicht auf dem Kontoauszug stehen. Zählt als Einnahme von Andre im gewählten Monat.</p>
@@ -596,6 +608,7 @@ function kmPer100(m){
   return {euro100:k/km*100,km,kosten:k,aktuell:cur.km,r12,text:"seit Übernahme "+new Date(first.datum).toLocaleDateString("de-DE",{month:"short",year:"numeric"})};
 }
 function rLaden(m){
+  rKmStand();
   const rows=ladenRows().filter(x=>ym(x.datum)===m);
   const kwh=rows.reduce((s,x)=>s+(x.kwh||0),0),e=rows.reduce((s,x)=>s+(x.betrag||0),0),eK=rows.filter(x=>x.kwh>0).reduce((s,x)=>s+(x.betrag||0),0);
   const km100=kmPer100(m);
@@ -1056,6 +1069,15 @@ function rEinz(m){const E=einzAlle(),y=m.slice(0,4),ey=E.filter(e=>e.datum.start
   $("#tEinz").innerHTML=E.length?`<thead><tr><th>Einnahme</th><th class="n">Betrag</th></tr></thead><tbody>`+[...E].sort((a,b)=>b.datum.localeCompare(a.datum)).map(e=>
     `<tr style="cursor:pointer" onclick="openEinz('${e.id}')"><td>${e.text||"Bareinnahme"}<span class="sub2">${new Date(e.datum).toLocaleDateString("de-DE")} · ${e.kategorie||"Bareinnahme"}</span></td><td class="n pos">+${eur(e.betrag,2)}</td></tr>`).join("")+"</tbody>":"";
   if(E.length)labelTable($("#tEinz"))}
+function kmLetzter(){return [...(D.km?.eintraege||[])].sort((a,b)=>a.datum<b.datum?-1:1).at(-1)}
+function rKmStand(){const l=kmLetzter();$("#kmStand").textContent=l?`Letzter Kilometerstand: ${l.km.toLocaleString("de-DE")} km am ${new Date(l.datum).toLocaleDateString("de-DE")}${l.notiz?" · "+l.notiz:""}`:"Noch kein Kilometerstand eingetragen"}
+function openKm(){$("#kmErr").textContent="";$("#kmDatum").value=new Date().toISOString().slice(0,10);$("#kmWert").value="";$("#kmNotiz").value="Tacho (Andre)";dlgKm.showModal();setTimeout(()=>$("#kmWert").focus(),50)}
+async function saveKm(){const datum=$("#kmDatum").value,km=Math.round(+$("#kmWert").value.replace(/\./g,"").replace(",",".")),notiz=$("#kmNotiz").value.trim(),l=kmLetzter();
+  if(!datum||!(km>0)){$("#kmErr").textContent="Bitte Datum und Kilometerstand angeben.";return}
+  if(l&&datum>=l.datum&&km<l.km&&!confirm(`Der Stand ${km.toLocaleString("de-DE")} km ist niedriger als der letzte (${l.km.toLocaleString("de-DE")} km). Trotzdem speichern?`))return;
+  $("#kmSave").disabled=true;$("#kmErr").textContent="Speichere …";
+  try{await commitData("km",d=>{d.eintraege=d.eintraege||[];const x=d.eintraege.find(z=>z.datum===datum);if(x){x.km=km;x.notiz=notiz}else d.eintraege.push({datum,km,notiz});d.eintraege.sort((a,b)=>a.datum<b.datum?-1:1);return `Kilometerstand ${km} km (${datum})`},{eintraege:[]});
+    dlgKm.close();render()}catch(e){$("#kmErr").textContent=e.message}finally{$("#kmSave").disabled=false}}
 function openEinz(id){const e=id&&einzAlle().find(x=>x.id===id);einzId=e?e.id:null;$("#einzErr").textContent="";
   $("#einzTitel").textContent=e?"Einzahlung ändern":"Einzahlung eintragen";$("#einzDel").classList.toggle("hidden",!e);
   $("#einzDatum").value=e?.datum||new Date().toISOString().slice(0,10);$("#einzBetrag").value=e?String(e.betrag).replace(".",","):"";
