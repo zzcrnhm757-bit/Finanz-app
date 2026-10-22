@@ -599,11 +599,10 @@ function kmPer100(m){
 function rLaden(m){
   const rows=ladenRows().filter(x=>ym(x.datum)===m);
   const kwh=rows.reduce((s,x)=>s+(x.kwh||0),0),e=rows.reduce((s,x)=>s+(x.betrag||0),0),eK=rows.filter(x=>x.kwh>0).reduce((s,x)=>s+(x.betrag||0),0);
-  const abo=D.laden?.ionity_abo;
   const km100=kmPer100(m);
   const kmKpi=km100?kpi("€ / 100 km",num(km100.euro100,2)+" €",`${eur(km100.kosten)} auf ${km100.km.toLocaleString("de-DE")} km · ${km100.text}`+(km100.r12?` · letzte 12 Monate ${num(km100.r12,2)} €`:"")):"";
   $("#kpisLaden").innerHTML=kpi("Ladekosten",eur(ladenPerson(e),2),monthName(m)+(person!=="alle"?" · dein Anteil":""))+kpi("Geladen",num(kwh)+" kWh",`${rows.length} Ladevorgänge`)+
-    kpi("Ø Preis",kwh?num(eK/kwh,3)+" €/kWh":"–","Vorgänge mit kWh-Angabe")+kmKpi+thgKpi(m)+(abo?kpi("IONITY-Abo",eur(abo.gebuehr,2),"seit "+new Date(abo.start).toLocaleDateString("de-DE")):"");
+    kpi("Ø Preis",kwh?num(eK/kwh,3)+" €/kWh":"–","Vorgänge mit kWh-Angabe")+kmKpi+thgKpi(m);
   rBord();rThg();
   const L=last12(m);const cols=["--s1","--s2","--s3","--s4","--s5"];
   $("#legLaden").innerHTML=PROV.map((p,i)=>`<span><i style="background:var(${cols[i]})"></i>${p}</span>`).join("");
