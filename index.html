@@ -1031,7 +1031,7 @@ let zuId=null,zuId_gesperrt=false;
 const zuSync=()=>{const g=document.querySelector('input[name=zuWer]:checked').value==="gemeinsam";document.querySelectorAll("#dlgZu .f-gem").forEach(e=>e.classList.toggle("hidden",!g))};
 document.querySelectorAll('input[name=zuWer]').forEach(r=>r.onchange=zuSync);
 const apAlle=()=>D.applepay&&!D.applepay.error?D.applepay.eintraege||[]:[];
-function apPseudo(e){const o=ZU()["ap:"+e.id];const x={id:"ap:"+e.id,datum:e.datum.slice(0,10),betrag:-e.betrag,empfaenger:e.haendler||"Apple Pay",bereich:"Ausgabe",kategorie:o?.kategorie||"Apple Pay (noch offen)",zweck:e.karte?`Apple Pay · ${e.karte}`:"Apple Pay"};
+function apPseudo(e){const o=ZU()["ap:"+e.id];const x={id:"ap:"+e.id,datum:e.datum.slice(0,10),betrag:-e.betrag,empfaenger:e.haendler||"Apple Pay",bereich:"Ausgabe",kategorie:o?.kategorie||"Apple Pay (noch offen)",zweck:(e.karte?`Apple Pay · ${e.karte}`:"Apple Pay")+(e.waehrung?` · ${num(e.betrag_orig,2)} ${e.waehrung}${e.kurs?` (Kurs ${num(e.kurs,4)})`:" (Kurs folgt)"}`:"")};
   if(o){x.zu=o;if(o.gemeinsam)x.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(e.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id}}return x}
 const zuFind=id=>id.startsWith("ap:")?(e=>e&&apPseudo(e))(apAlle().find(e=>"ap:"+e.id===id)):kRows().find(b=>b.id===id);
 function rAp(){const m=$("#month").value,imKonto=new Set((D.konto_andre?.buchungen||[]).filter(b=>b.applepay).map(b=>b.applepay.id));
