@@ -326,6 +326,21 @@ dialog select,dialog input,dialog textarea{width:100%}
   <p class="note" id="einzErr" style="color:var(--bad)"></p>
   <div class="row"><button id="einzDel" style="margin-right:auto;color:var(--bad)" onclick="saveEinz(true)">Löschen</button><button onclick="dlgEinz.close()">Abbrechen</button><button class="primary" id="einzSave" onclick="saveEinz()">Speichern</button></div>
 </dialog>
+<dialog id="dlgGs">
+  <h2 style="margin:0 0 4px;font-size:17px" id="gsTitel">Gutschrift</h2>
+  <p class="note" style="margin-top:0" id="gsInfo"></p>
+  <div id="gsListe"></div>
+  <div class="form" id="gsFormKosten">
+    <div><label for="gsBetrag">Betrag (€)</label><input id="gsBetrag" inputmode="decimal" placeholder="76,90"></div>
+    <div><label for="gsVon">Von</label><input id="gsVon" placeholder="z. B. Mario"></div>
+  </div>
+  <div class="form" id="gsFormGuthaben">
+    <div class="w2"><label for="gsZiel">Gehört zu</label><select id="gsZiel"></select></div>
+    <div class="w2"><label for="gsNotiz">Notiz</label><input id="gsNotiz" placeholder="z. B. Arztkosten 09–10/2026"></div>
+  </div>
+  <p class="note" id="gsErr" style="color:var(--bad)"></p>
+  <div class="row"><button onclick="dlgGs.close()">Abbrechen</button><button class="primary" id="gsSave" onclick="saveGs()">Speichern</button></div>
+</dialog>
 <dialog id="dlgZu">
   <h2 style="margin:0 0 4px;font-size:17px">Zahlung zuordnen</h2>
   <p class="note" style="margin-top:0" id="zuInfo"></p>
@@ -482,7 +497,7 @@ function bisher(p,m){ // angefallene Kosten dieses Postens von Beginn bis Ende d
 // Tabellen: Spaltennamen als data-label für die Kartenansicht am Handy
 function labelTable(t){const h=[...t.querySelectorAll("thead th")].map(x=>x.textContent);t.querySelectorAll("tbody tr").forEach(r=>[...r.children].forEach((td,i)=>{if(!td.hasAttribute("colspan"))td.dataset.label=h[i]||""}))}
 const barEin=m=>einzAlle().filter(e=>ym(e.datum)===m).reduce((s,e)=>s+e.betrag,0);
-function andreKontoEin(m){const r=(D.konto_andre?.buchungen||[]).filter(x=>ym(x.datum)===m&&x.bereich==="Einnahme"&&x.kategorie!=="Familie");return r.length?r.reduce((s,x)=>s+x.betrag,0)+barEin(m):null}
+function andreKontoEin(m){const r=(D.konto_andre?.buchungen||[]).filter(x=>ym(x.datum)===m&&x.bereich==="Einnahme"&&x.kategorie!=="Familie"&&!gsLink(ZU()[x.id]));return r.length?r.reduce((s,x)=>s+x.betrag,0)+barEin(m):null}
 function einnahmen(m){const e=D.fixkosten?.einnahmen||{};const k=m?andreKontoEin(m):null;const a=k??((e.andre_netto||0)+(e.mieteinnahme||0)+(m?barEin(m):0)),c=e.claudi_netto||0;return share(a,c)}
 const swRows=()=>(D.splitwise?.eintraege||[]);
 const ladenRows=()=>(D.laden?.vorgaenge||[]);
@@ -846,10 +861,25 @@ function rVar(m){rBudget(m);
 const ZU=()=>D.konto_zuordnung&&!D.konto_zuordnung.error?D.konto_zuordnung.buchungen||{}:{};
 const einzAlle=()=>D.fixkosten?.einzahlungen||[];
 const barRows=()=>einzAlle().map(e=>({id:"bar:"+e.id,datum:e.datum,betrag:e.betrag,empfaenger:e.text||"Bareinnahme",bereich:"Einnahme",kategorie:e.kategorie||"Bareinnahme",zweck:"bar / ohne Konto – von Hand eingetragen",bar:true}));
-const kRows=()=>{const z=ZU();return (D.konto_andre?.buchungen||[]).concat(barRows()).map(x=>{const o=z[x.id]||(x.applepay&&z["ap:"+x.applepay.id]);if(!o)return x;const y={...x,zu:o};
-  if(o.kategorie)y.kategorie=o.kategorie;
-  if(o.gemeinsam&&!x.splitwise&&x.betrag<0)y.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(-x.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id};
+const gsLink=o=>o&&(o.gutschrift_fuer||o.gutschrift_kat);
+const kRows=()=>{const z=ZU(),bu=D.konto_andre?.buchungen||[],byId=Object.fromEntries(bu.map(b=>[b.id,b])),gs={};
+  Object.entries(z).forEach(([id,o])=>{const c=byId[id];if(c&&o.gutschrift_fuer)(gs[o.gutschrift_fuer]=gs[o.gutschrift_fuer]||[]).push({betrag:c.betrag,von:c.empfaenger,datum:c.datum,notiz:o.notiz})});
+  const swUsed=new Set(bu.map(b=>b.splitwise?.id).filter(Boolean));
+  return bu.concat(barRows()).map(x=>{const o0=z[x.id],o=o0||(x.applepay&&z["ap:"+x.applepay.id]);let y=x;
+  if(o){y={...x,zu:o};if(o.kategorie)y.kategorie=o.kategorie;
+    if(o.gemeinsam&&!x.splitwise&&x.betrag<0)y.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(-x.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id}}
+  if(gsLink(o0)&&x.betrag>0){const t=o0.gutschrift_fuer?byId[o0.gutschrift_fuer]:null,tk=t?(z[t.id]?.kategorie||t.kategorie):o0.gutschrift_kat;
+    y={...y,zu:o0,bereich:t?.bereich||"Ausgabe",kategorie:tk.replace(" (Erstattung)","")+" (Erstattung)",gutschrift_zu:t?t.empfaenger:tk,gutschrift_notiz:o0.notiz}}
+  const man=o0?.gutschriften||[];
+  if(gs[x.id]||man.length){y={...y,gutschriften:[...(gs[x.id]||[]),...man.map(g=>({...g,manuell:true}))]};
+    const s=man.reduce((a,g)=>a+g.betrag,0);
+    if(s){y.betrag_beleg=x.betrag;y.betrag=Math.round((x.betrag+s)*100)/100;
+      if(!y.splitwise&&y.betrag<0){const e=(D.splitwise_variabel?.eintraege||[]).concat(D.splitwise?.eintraege||[]).find(e=>e.bezahlt_von==="Andre"&&e.typ!=="Ausgleich"&&!swUsed.has(e.id)&&Math.abs(e.kosten+y.betrag)<=.02&&Math.abs(new Date(e.datum)-new Date(x.datum))<=14*864e5);
+        if(e){swUsed.add(e.id);y.splitwise={id:e.id,gruppe:e.gruppe||"Kosten Xer",anteil_andre:e.anteil_andre}}}}}
   return y})};
+const gsText=x=>{let s="";if(x.gutschriften){const n=x.gutschriften.reduce((a,g)=>a+g.betrag,0),b=-(x.betrag_beleg??x.betrag);
+    s+=` · ↩ Gutschrift ${x.gutschriften.map(g=>`${eur(g.betrag,2)} von ${g.von}`).join(", ")} · Beleg ${eur(b,2)}, netto ${eur(b-n,2)}`}
+  if(x.gutschrift_zu)s+=` · ↩ Gutschrift zu ${x.gutschrift_zu}${x.gutschrift_notiz?" ("+x.gutschrift_notiz+")":""}`;return s};
 const KB=[["Einnahme","Einnahmen","--good"],["Fixkosten","Fixkosten","--s1"],["Laden","Laden","--s3"],["Ausgabe","Eigene Ausgaben","--s2"],["Splitwise","über Splitwise geteilt","--s4"],["Ausgleich","Ausgleich Claudia / Regine","--s5"],["Sparen/Umbuchung","Sparen & Umbuchung","--s7"]];
 const kBer=x=>x.bereich==="Ausgabe"&&x.splitwise?"Splitwise":x.bereich;
 let kFilter="alle";
@@ -874,7 +904,8 @@ function rKonto(m){rUew(m);rAp();rEinz(m);
     options:baseOpts({scales:{x:{grid:{display:false},ticks:{color:css("--text-2")},stacked:true},y:{grid:{color:css("--line")},border:{display:false},ticks:{color:css("--text-2"),callback:v=>eur(v)},stacked:true}}})});
   const kat={};kRows().filter(x=>ym(x.datum)===m&&x.bereich==="Ausgabe"&&!x.splitwise).forEach(x=>{const k=x.kategorie.replace(" (Erstattung)","");kat[k]=(kat[k]||0)-x.betrag});
   const ent=Object.entries(kat).filter(([,v])=>v>0.5).sort((a,b)=>b[1]-a[1]);
-  $("#hintKontoKat").textContent=`${monthName(m)} · ohne Splitwise-Ausgaben, Erstattungen verrechnet · antippen filtert die Buchungen`;
+  const gsM=kRows().filter(x=>ym(x.datum)===m&&x.gutschrift_zu).map(x=>`${x.empfaenger} ${eur(x.betrag,2)} → ${x.gutschrift_zu}`);
+  $("#hintKontoKat").textContent=`${monthName(m)} · ohne Splitwise-Ausgaben, Erstattungen verrechnet · antippen filtert die Buchungen`+(gsM.length?` · Gutschriften: ${gsM.join("; ")}`:"");
   donut("cKontoKat","legKontoKat",ent,k=>{kFilter="Ausgabe";$("#qKonto").value=$("#qKonto").value===k?"":k;rKonto($("#month").value);$("#tKonto").scrollIntoView({behavior:"smooth"})});
   $("#kontoBereich").innerHTML=[["alle","Alle"],["Ausgabe","Eigene"],["Splitwise","Splitwise"],["Fixkosten","Fix"],["Einnahme","Einnahmen"]].map(([k,n])=>`<button data-b="${k}" aria-pressed="${kFilter===k}">${n}</button>`).join("");
   $("#kontoBereich").querySelectorAll("button").forEach(b=>b.onclick=()=>{kFilter=b.dataset.b;rKonto(m)});
@@ -882,7 +913,7 @@ function rKonto(m){rUew(m);rAp();rEinz(m);
   const kk=x=>x.kategorie.replace(" (Erstattung)","").toLowerCase(),exK=q&&kRows().some(x=>ym(x.datum)===m&&kk(x)===q);
   const rows=kRows().filter(x=>ym(x.datum)===m&&(kFilter==="alle"||kBer(x)===kFilter)&&(!q||(exK?kk(x)===q:[x.empfaenger,x.kategorie,x.bereich].join(" ").toLowerCase().includes(q))));
   $("#tKonto").innerHTML=`<thead><tr><th>Buchung</th><th>Kategorie</th><th class="n">Betrag</th></tr></thead><tbody>`+
-    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")}${x.splitwise?` · ${x.splitwise.geplant?"wird in Splitwise eingetragen":"in Splitwise"} (${x.splitwise.gruppe}), dein Anteil ${eur(x.splitwise.anteil_andre,2)}`:""}${x.zweck?" · "+x.zweck:""}</span></td><td>${x.kategorie}<span class="sub2">${x.bereich}</span></td><td class="n ${x.betrag>0?"pos":""}">${eur(x.betrag,2)}${x.betrag<0&&(x.bereich==="Ausgabe"||x.zu)?` <button class="btn-s" style="margin-left:6px" onclick="openZu('${x.id}')" aria-label="Zuordnen">${x.zu?.gemeinsam?"👥":"✎"}</button>`:""}</td></tr>`).join(""):`<tr><td colspan="3">Keine Buchungen.</td></tr>`)+"</tbody>";
+    (rows.length?rows.slice().reverse().map(x=>`<tr><td>${x.empfaenger}<span class="sub2">${new Date(x.kaufdatum||x.datum).toLocaleDateString("de-DE")}${x.splitwise?` · ${x.splitwise.geplant?"wird in Splitwise eingetragen":"in Splitwise"} (${x.splitwise.gruppe}), dein Anteil ${eur(x.splitwise.anteil_andre,2)}`:""}${x.zweck?" · "+x.zweck:""}${gsText(x)}</span></td><td>${x.kategorie}<span class="sub2">${x.bereich}</span></td><td class="n ${x.betrag>0?"pos":""}">${eur(x.betrag,2)}${x.betrag<0&&(x.bereich==="Ausgabe"||x.zu)?` <button class="btn-s" style="margin-left:6px" onclick="openZu('${x.id}')" aria-label="Zuordnen">${x.zu?.gemeinsam?"👥":"✎"}</button>`:""}${!x.bar&&["Ausgabe","Fixkosten","Laden","Einnahme"].includes(x.bereich)?` <button class="btn-s" style="margin-left:4px" onclick="openGs('${x.id}')" aria-label="Gutschrift" title="Gutschrift">↩</button>`:""}</td></tr>`).join(""):`<tr><td colspan="3">Keine Buchungen.</td></tr>`)+"</tbody>";
   labelTable($("#tKonto"))}
 
 
@@ -1057,9 +1088,37 @@ async function saveZu(){const x0=zuFind(zuId),x=zuId.startsWith("ap:")?{...x0,ka
       if(kat&&kat!==x.kategorie.replace(" (Erstattung)",""))o.kategorie=kat;else delete o.kategorie;
       if(zuId_gesperrt){o.gemeinsam=alt.gemeinsam||false}else if(gem)Object.assign(o,{gruppe:$("#zuGruppe").value,anteil_claudia:+$("#zuAnteil").value,beschreibung:$("#zuText").value.trim()||x.empfaenger});else["gruppe","anteil_claudia","beschreibung"].forEach(k=>delete o[k]);
       if(o.splitwise_id){o.gemeinsam=true}
-      if(!o.gemeinsam&&!o.kategorie&&!o.splitwise_id)delete data.buchungen[zuId];else data.buchungen[zuId]=o;data.stand=new Date().toISOString().slice(0,16);
+      if(!o.gemeinsam&&!o.kategorie&&!o.splitwise_id&&!o.gutschriften?.length&&!gsLink(o))delete data.buchungen[zuId];else data.buchungen[zuId]=o;data.stand=new Date().toISOString().slice(0,16);
       return `Konto: ${x.empfaenger} ${eur(-x.betrag,2)} → ${zuId_gesperrt?"(steht schon in Splitwise)":gem?"gemeinsam ("+o.gruppe+")":"nur Andre"}${o.kategorie?", Kategorie "+o.kategorie:""}`},{hinweis:"Zuordnungen von Kontobuchungen aus der App (id = Buchungs-ID aus konto_andre.json)",buchungen:{}});
     dlgZu.close();render()}catch(e){$("#zuErr").textContent=e.message}finally{$("#zuSave").disabled=false}}
+
+/* ---------- Gutschriften zu Kosten ---------- */
+let gsId=null,gsMan=[];
+const gsRaw=id=>(D.konto_andre?.buchungen||[]).find(b=>b.id===id);
+function gsListe(){$("#gsListe").innerHTML=gsMan.map((g,i)=>`<p class="note" style="margin:4px 0">${eur(g.betrag,2)} von ${g.von} <button class="btn-s" onclick="gsMan.splice(${i},1);gsListe()" aria-label="Entfernen">✕</button></p>`).join("")}
+function openGs(id){const x=gsRaw(id);if(!x)return;gsId=id;const o=ZU()[id]||{};$("#gsErr").textContent="";const haben=x.betrag>0;
+  $("#gsTitel").textContent=haben?"Gutschrift einem Kostenpunkt zuordnen":"Gutschrift zu dieser Rechnung";
+  $("#gsInfo").textContent=`${x.empfaenger} · ${new Date(x.datum).toLocaleDateString("de-DE")} · ${eur(Math.abs(x.betrag),2)}`+(haben?" · zählt dann nicht als Einnahme, sondern mindert die Kosten":" · z. B. Anteil, den jemand anderes übernimmt – mindert deine Ausgabe, auch ohne Geldeingang auf dem Konto");
+  $("#gsFormKosten").style.display=haben?"none":"";$("#gsFormGuthaben").style.display=haben?"":"none";
+  gsMan=haben?[]:(o.gutschriften||[]).map(g=>({...g}));gsListe();$("#gsBetrag").value="";$("#gsVon").value="";
+  if(haben){const ms=864e5,c=(D.konto_andre?.buchungen||[]).filter(b=>b.betrag<0&&["Ausgabe","Fixkosten","Laden"].includes(b.bereich)&&(new Date(x.datum)-new Date(b.datum))/ms>=-7&&(new Date(x.datum)-new Date(b.datum))/ms<=120)
+      .sort((a,b)=>(Math.abs(a.betrag+x.betrag)<.01?0:1)-(Math.abs(b.betrag+x.betrag)<.01?0:1)||b.datum.localeCompare(a.datum)).slice(0,80);
+    const kats=[...new Set(kRows().filter(b=>b.bereich==="Ausgabe").map(b=>b.kategorie.replace(" (Erstattung)","")))].sort(),s=$("#gsZiel");s.innerHTML="";
+    s.add(new Option("— keine, bleibt Einnahme —",""));
+    const g1=document.createElement("optgroup");g1.label="Kostenpunkt";kats.forEach(k=>g1.append(new Option(k,"k:"+k)));s.append(g1);
+    const g2=document.createElement("optgroup");g2.label="Einzelne Rechnung";c.forEach(b=>g2.append(new Option(`${new Date(b.datum).toLocaleDateString("de-DE")} ${b.empfaenger} ${eur(-b.betrag,2)}`,b.id)));s.append(g2);
+    s.value=o.gutschrift_fuer||(o.gutschrift_kat?"k:"+o.gutschrift_kat:"");$("#gsNotiz").value=o.notiz||""}
+  dlgGs.showModal()}
+async function saveGs(){const x=gsRaw(gsId),haben=x.betrag>0;const b=parseFloat($("#gsBetrag").value.trim().replace(/\./g,"").replace(",",".")),von=$("#gsVon").value.trim();
+  if(!haben&&$("#gsBetrag").value.trim()){if(!(b>0)||!von){$("#gsErr").textContent="Bitte Betrag und „Von“ angeben.";return}gsMan.push({betrag:Math.round(b*100)/100,von})}
+  if(!haben&&gsMan.reduce((a,g)=>a+g.betrag,0)>-x.betrag+.005){$("#gsErr").textContent="Gutschriften sind höher als die Rechnung.";if($("#gsBetrag").value.trim())gsMan.pop();return}
+  const ziel=$("#gsZiel").value,notiz=$("#gsNotiz").value.trim();$("#gsSave").disabled=true;$("#gsErr").textContent="Speichere …";
+  try{await commitData("konto_zuordnung",data=>{data.buchungen=data.buchungen||{};const o={...(data.buchungen[gsId]||{}),datum:x.datum,betrag:-x.betrag,empfaenger:x.empfaenger,gemeinsam:data.buchungen[gsId]?.gemeinsam||false,zeit:new Date().toISOString().slice(0,16)};
+      delete o.gutschrift_fuer;delete o.gutschrift_kat;delete o.notiz;delete o.gutschriften;
+      if(haben){if(ziel.startsWith("k:"))o.gutschrift_kat=ziel.slice(2);else if(ziel)o.gutschrift_fuer=ziel;if(ziel&&notiz)o.notiz=notiz}else if(gsMan.length)o.gutschriften=gsMan;
+      if(!o.gemeinsam&&!o.kategorie&&!o.splitwise_id&&!o.gutschriften?.length&&!gsLink(o))delete data.buchungen[gsId];else data.buchungen[gsId]=o;data.stand=new Date().toISOString().slice(0,16);
+      return `Gutschrift: ${x.empfaenger} ${eur(Math.abs(x.betrag),2)}`},{hinweis:"Zuordnungen von Kontobuchungen aus der App (id = Buchungs-ID aus konto_andre.json)",buchungen:{}});
+    dlgGs.close();render()}catch(e){$("#gsErr").textContent=e.message}finally{$("#gsSave").disabled=false}}
 
 /* ---------- Einzahlungen ohne Konto ---------- */
 let einzId=null;
@@ -1131,7 +1190,7 @@ function rJahr(y){
     .concat(fixPosten().flatMap(p=>perioden(p).filter(q=>q.bis&&q.bis.startsWith(y)&&q===perioden(p).at(-1)).map(q=>({p,q,ende:true}))));
   $("#tJahrFix").innerHTML=`<thead><tr><th>Posten</th><th class="n">vorher</th><th class="n">neu</th></tr></thead><tbody>`+(ch.length?ch.sort((a,b)=>(a.ende?a.q.bis:a.q.ab)<(b.ende?b.q.bis:b.q.ab)?-1:1).map(({p,q,vor,ende})=>
     `<tr><td>${p.posten}<span class="sub2">${ende?"beendet "+new Date(q.bis).toLocaleDateString("de-DE"):(vor?"geändert ab ":"neu ab ")+new Date(q.ab).toLocaleDateString("de-DE")} · ${p.kategorie}</span></td><td class="n">${ende?eur(q.gesamt,2):vor?eur(vor.gesamt,2):"–"}</td><td class="n ${ende?"pos":""}">${ende?"–":eur(q.gesamt,2)}</td></tr>`).join(""):`<tr><td colspan="3">Keine Änderungen erfasst.</td></tr>`)+"</tbody>";labelTable($("#tJahrFix"));
-  const kr=(D.konto_andre?.buchungen||[]).filter(x=>x.datum.startsWith(y));
+  const kr=kRows().filter(x=>!x.bar&&x.datum.startsWith(y));
   if(kr.length&&person!=="claudia"){const g=b=>kr.filter(x=>kBer(x)===b).reduce((s,x)=>s+x.betrag,0);const kat2={};kr.filter(x=>x.bereich==="Ausgabe"&&!x.splitwise).forEach(x=>{const k=x.kategorie.replace(" (Erstattung)","");kat2[k]=(kat2[k]||0)-x.betrag});
     const e2=Object.entries(kat2).sort((a,b)=>b[1]-a[1]).slice(0,8);
     $("#tJahrKonto").innerHTML=`<thead><tr><th>Posten</th><th class="n">Betrag</th></tr></thead><tbody>`+
