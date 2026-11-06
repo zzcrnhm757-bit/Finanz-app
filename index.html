@@ -335,7 +335,8 @@ dialog select,dialog input,dialog textarea{width:100%}
     <div><label for="gsVon">Von</label><input id="gsVon" placeholder="z. B. Mario"></div>
   </div>
   <div class="form" id="gsFormGuthaben">
-    <div class="w2"><label for="gsZiel">Gehört zu</label><select id="gsZiel"></select></div>
+    <div class="w2"><label for="gsZiel">Kostenpunkt</label><select id="gsZiel"></select></div>
+    <div class="w2"><label>Rechnungen (auch mehrere)</label><div id="gsRechn" style="max-height:190px;overflow:auto;font-size:13.5px"></div><p class="note" id="gsSumme" style="margin:4px 0 0"></p></div>
     <div class="w2"><label for="gsNotiz">Notiz</label><input id="gsNotiz" placeholder="z. B. Arztkosten 09–10/2026"></div>
   </div>
   <p class="note" id="gsErr" style="color:var(--bad)"></p>
@@ -863,13 +864,13 @@ const einzAlle=()=>D.fixkosten?.einzahlungen||[];
 const barRows=()=>einzAlle().map(e=>({id:"bar:"+e.id,datum:e.datum,betrag:e.betrag,empfaenger:e.text||"Bareinnahme",bereich:"Einnahme",kategorie:e.kategorie||"Bareinnahme",zweck:"bar / ohne Konto – von Hand eingetragen",bar:true}));
 const gsLink=o=>o&&(o.gutschrift_fuer||o.gutschrift_kat);
 const kRows=()=>{const z=ZU(),bu=D.konto_andre?.buchungen||[],byId=Object.fromEntries(bu.map(b=>[b.id,b])),gs={};
-  Object.entries(z).forEach(([id,o])=>{const c=byId[id];if(c&&o.gutschrift_fuer)(gs[o.gutschrift_fuer]=gs[o.gutschrift_fuer]||[]).push({betrag:c.betrag,von:c.empfaenger,datum:c.datum,notiz:o.notiz})});
+  Object.entries(z).forEach(([id,o])=>{const c=byId[id];if(c&&o.gutschrift_fuer){const l=[].concat(o.gutschrift_fuer);l.forEach(i=>(gs[i]=gs[i]||[]).push({betrag:c.betrag,von:c.empfaenger,datum:c.datum,notiz:o.notiz,teil:l.length}))}});
   const swUsed=new Set(bu.map(b=>b.splitwise?.id).filter(Boolean));
   return bu.concat(barRows()).map(x=>{const o0=z[x.id],o=o0||(x.applepay&&z["ap:"+x.applepay.id]);let y=x;
   if(o){y={...x,zu:o};if(o.kategorie)y.kategorie=o.kategorie;
     if(o.gemeinsam&&!x.splitwise&&x.betrag<0)y.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(-x.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id}}
-  if(gsLink(o0)&&x.betrag>0){const t=o0.gutschrift_fuer?byId[o0.gutschrift_fuer]:null,tk=t?(z[t.id]?.kategorie||t.kategorie):o0.gutschrift_kat;
-    y={...y,zu:o0,bereich:t?.bereich||"Ausgabe",kategorie:tk.replace(" (Erstattung)","")+" (Erstattung)",gutschrift_zu:t?t.empfaenger:tk,gutschrift_notiz:o0.notiz}}
+  if(gsLink(o0)&&x.betrag>0){const ts=[].concat(o0.gutschrift_fuer||[]).map(i=>byId[i]).filter(Boolean),t=ts[0],tk=t?(z[t.id]?.kategorie||t.kategorie):o0.gutschrift_kat||"Sonstiges",su=ts.reduce((a,b)=>a-b.betrag,0);
+    y={...y,zu:o0,bereich:t?.bereich||"Ausgabe",kategorie:tk.replace(" (Erstattung)","")+" (Erstattung)",gutschrift_zu:ts.length>1?`${ts.length} Rechnungen (${eur(su,2)}, nicht erstattet ${eur(su-x.betrag,2)})`:t?t.empfaenger:tk,gutschrift_notiz:o0.notiz}}
   const man=o0?.gutschriften||[];
   if(gs[x.id]||man.length){y={...y,gutschriften:[...(gs[x.id]||[]),...man.map(g=>({...g,manuell:true}))]};
     const s=man.reduce((a,g)=>a+g.betrag,0);
@@ -878,7 +879,7 @@ const kRows=()=>{const z=ZU(),bu=D.konto_andre?.buchungen||[],byId=Object.fromEn
         if(e){swUsed.add(e.id);y.splitwise={id:e.id,gruppe:e.gruppe||"Kosten Xer",anteil_andre:e.anteil_andre}}}}}
   return y})};
 const gsText=x=>{let s="";if(x.gutschriften){const n=x.gutschriften.reduce((a,g)=>a+g.betrag,0),b=-(x.betrag_beleg??x.betrag);
-    s+=` · ↩ Gutschrift ${x.gutschriften.map(g=>`${eur(g.betrag,2)} von ${g.von}`).join(", ")} · Beleg ${eur(b,2)}, netto ${eur(b-n,2)}`}
+    const teil=x.gutschriften.some(g=>g.teil>1);s+=teil?` · ↩ ${x.gutschriften.map(g=>g.teil>1?`Teil der Gutschrift ${eur(g.betrag,2)} von ${g.von} (${g.teil} Rechnungen)`:`Gutschrift ${eur(g.betrag,2)} von ${g.von}`).join(", ")}`:` · ↩ Gutschrift ${x.gutschriften.map(g=>`${eur(g.betrag,2)} von ${g.von}`).join(", ")} · Beleg ${eur(b,2)}, netto ${eur(b-n,2)}`}
   if(x.gutschrift_zu)s+=` · ↩ Gutschrift zu ${x.gutschrift_zu}${x.gutschrift_notiz?" ("+x.gutschrift_notiz+")":""}`;return s};
 const KB=[["Einnahme","Einnahmen","--good"],["Fixkosten","Fixkosten","--s1"],["Laden","Laden","--s3"],["Ausgabe","Eigene Ausgaben","--s2"],["Splitwise","über Splitwise geteilt","--s4"],["Ausgleich","Ausgleich Claudia / Regine","--s5"],["Sparen/Umbuchung","Sparen & Umbuchung","--s7"]];
 const kBer=x=>x.bereich==="Ausgabe"&&x.splitwise?"Splitwise":x.bereich;
@@ -1102,20 +1103,24 @@ function openGs(id){const x=gsRaw(id);if(!x)return;gsId=id;const o=ZU()[id]||{};
   $("#gsFormKosten").style.display=haben?"none":"";$("#gsFormGuthaben").style.display=haben?"":"none";
   gsMan=haben?[]:(o.gutschriften||[]).map(g=>({...g}));gsListe();$("#gsBetrag").value="";$("#gsVon").value="";
   if(haben){const ms=864e5,c=(D.konto_andre?.buchungen||[]).filter(b=>b.betrag<0&&["Ausgabe","Fixkosten","Laden"].includes(b.bereich)&&(new Date(x.datum)-new Date(b.datum))/ms>=-7&&(new Date(x.datum)-new Date(b.datum))/ms<=120)
-      .sort((a,b)=>(Math.abs(a.betrag+x.betrag)<.01?0:1)-(Math.abs(b.betrag+x.betrag)<.01?0:1)||b.datum.localeCompare(a.datum)).slice(0,80);
+      .sort((a,b)=>(Math.abs(a.betrag+x.betrag)<.01?0:1)-(Math.abs(b.betrag+x.betrag)<.01?0:1)||b.datum.localeCompare(a.datum));
     const kats=[...new Set(kRows().filter(b=>b.bereich==="Ausgabe").map(b=>b.kategorie.replace(" (Erstattung)","")))].sort(),s=$("#gsZiel");s.innerHTML="";
     s.add(new Option("— keine, bleibt Einnahme —",""));
     const g1=document.createElement("optgroup");g1.label="Kostenpunkt";kats.forEach(k=>g1.append(new Option(k,"k:"+k)));s.append(g1);
-    const g2=document.createElement("optgroup");g2.label="Einzelne Rechnung";c.forEach(b=>g2.append(new Option(`${new Date(b.datum).toLocaleDateString("de-DE")} ${b.empfaenger} ${eur(-b.betrag,2)}`,b.id)));s.append(g2);
-    s.value=o.gutschrift_fuer||(o.gutschrift_kat?"k:"+o.gutschrift_kat:"");$("#gsNotiz").value=o.notiz||""}
+    s.append(g1);const sel=new Set([].concat(o.gutschrift_fuer||[]));
+    c.sort((a,b)=>(sel.has(b.id)?1:0)-(sel.has(a.id)?1:0));
+    $("#gsRechn").innerHTML=c.slice(0,Math.max(80,sel.size)).map(b=>`<label style="display:flex;gap:8px;padding:3px 0;font-weight:400"><input type="checkbox" value="${b.id}" data-b="${-b.betrag}" style="width:auto"${sel.has(b.id)?" checked":""}><span>${new Date(b.datum).toLocaleDateString("de-DE")} ${b.empfaenger} ${eur(-b.betrag,2)}</span></label>`).join("");
+    const su=()=>{const v=[...document.querySelectorAll("#gsRechn input:checked")].reduce((a,e)=>a+ +e.dataset.b,0);$("#gsSumme").textContent=v?`Ausgewählt ${eur(v,2)} · nicht erstattet ${eur(v-x.betrag,2)}`:""};
+    $("#gsRechn").onchange=su;su();
+    s.value=o.gutschrift_kat?"k:"+o.gutschrift_kat:"";$("#gsNotiz").value=o.notiz||""}
   dlgGs.showModal()}
 async function saveGs(){const x=gsRaw(gsId),haben=x.betrag>0;const b=parseFloat($("#gsBetrag").value.trim().replace(/\./g,"").replace(",",".")),von=$("#gsVon").value.trim();
   if(!haben&&$("#gsBetrag").value.trim()){if(!(b>0)||!von){$("#gsErr").textContent="Bitte Betrag und „Von“ angeben.";return}gsMan.push({betrag:Math.round(b*100)/100,von})}
   if(!haben&&gsMan.reduce((a,g)=>a+g.betrag,0)>-x.betrag+.005){$("#gsErr").textContent="Gutschriften sind höher als die Rechnung.";if($("#gsBetrag").value.trim())gsMan.pop();return}
-  const ziel=$("#gsZiel").value,notiz=$("#gsNotiz").value.trim();$("#gsSave").disabled=true;$("#gsErr").textContent="Speichere …";
+  const ziel=$("#gsZiel").value,notiz=$("#gsNotiz").value.trim(),re=[...document.querySelectorAll("#gsRechn input:checked")].map(e=>e.value);$("#gsSave").disabled=true;$("#gsErr").textContent="Speichere …";
   try{await commitData("konto_zuordnung",data=>{data.buchungen=data.buchungen||{};const o={...(data.buchungen[gsId]||{}),datum:x.datum,betrag:-x.betrag,empfaenger:x.empfaenger,gemeinsam:data.buchungen[gsId]?.gemeinsam||false,zeit:new Date().toISOString().slice(0,16)};
       delete o.gutschrift_fuer;delete o.gutschrift_kat;delete o.notiz;delete o.gutschriften;
-      if(haben){if(ziel.startsWith("k:"))o.gutschrift_kat=ziel.slice(2);else if(ziel)o.gutschrift_fuer=ziel;if(ziel&&notiz)o.notiz=notiz}else if(gsMan.length)o.gutschriften=gsMan;
+      if(haben){if(re.length)o.gutschrift_fuer=re.length>1?re:re[0];else if(ziel.startsWith("k:"))o.gutschrift_kat=ziel.slice(2);if((re.length||ziel)&&notiz)o.notiz=notiz}else if(gsMan.length)o.gutschriften=gsMan;
       if(!o.gemeinsam&&!o.kategorie&&!o.splitwise_id&&!o.gutschriften?.length&&!gsLink(o))delete data.buchungen[gsId];else data.buchungen[gsId]=o;data.stand=new Date().toISOString().slice(0,16);
       return `Gutschrift: ${x.empfaenger} ${eur(Math.abs(x.betrag),2)}`},{hinweis:"Zuordnungen von Kontobuchungen aus der App (id = Buchungs-ID aus konto_andre.json)",buchungen:{}});
     dlgGs.close();render()}catch(e){$("#gsErr").textContent=e.message}finally{$("#gsSave").disabled=false}}
