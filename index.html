@@ -105,7 +105,7 @@ td{overflow-wrap:anywhere}
 .toolbar h2{margin:0}
 tr.ended td{color:var(--text-3)}
 .sub2{display:block;color:var(--text-3);font-size:12px}
-#tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2),#tUewFix td.n b,#tUewFix th.n{white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}
+#tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2),#tUewFix td.n b,#tUewFix th.n{white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}#tFix tr.katrow{cursor:pointer}#tFix tr.katrow:hover td{background:var(--surface-2)}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .form .w2{grid-column:1/-1}
 .form label{margin-top:10px}
@@ -130,6 +130,7 @@ dialog select,dialog input,dialog textarea{width:100%}
   table.resp tr.cat{padding:6px 0 2px;border:0}
   table.resp tr.cat td{background:none;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2)}
   table.resp td.act{justify-content:flex-end}
+  #tFix tr.katrow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}#tFix tr.katrow td{display:none}#tFix tr.katrow td:first-child,#tFix tr.katrow td:nth-child(6){display:block;width:auto;font-size:13px}#tFix tr.katrow td:nth-child(6)::before{content:none}
   .form{grid-template-columns:1fr}
 }
 @media (max-width:560px){nav button{padding:8px 8px;font-size:14px}.kpi .value{font-size:23px}.chart{height:240px}h1{width:100%}}
@@ -201,8 +202,8 @@ dialog select,dialog input,dialog textarea{width:100%}
       <div class="card"><h2>Entwicklung der Fixkosten</h2><p class="hint" id="hintFixVerlauf"></p><div class="chart"><canvas id="cFixVerlauf"></canvas></div></div>
       <div class="card"><h2>Fixkosten nach Kategorie</h2><p class="hint" id="hintFix"></p><div class="donut"><div class="chart"><canvas id="cFix"></canvas></div><ul class="dleg" id="legFix"></ul></div></div>
     </div>
-    <div class="card full"><div class="toolbar"><h2>Alle Posten</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s" id="btnRuhend" onclick="zeigRuhend=!zeigRuhend;rFix($('#month').value)"></button><button class="primary btn-s" onclick="openEdit(null)">+ Neuer Posten</button></div></div>
-      <p class="hint">Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „pro Jahr“ = Jahresbetrag (fett = tatsächlicher Jahresbeitrag) · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
+    <div class="card full"><div class="toolbar"><h2>Alle Posten</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-s" id="btnKat"></button><button class="btn-s" id="btnRuhend" onclick="zeigRuhend=!zeigRuhend;rFix($('#month').value)"></button><button class="primary btn-s" onclick="openEdit(null)">+ Neuer Posten</button></div></div>
+      <p class="hint">Kategorie antippen klappt die Posten auf · Monatliche Beträge (Jahreszahlungen anteilig) im gewählten Monat · „pro Jahr“ = Jahresbetrag (fett = tatsächlicher Jahresbeitrag) · „bisher“ = seit Beginn angefallen · ✎ zum Ändern</p>
       <input type="search" id="qFix" placeholder="Posten suchen (Name, Anbieter, Kategorie)" style="width:100%;margin-bottom:8px">
       <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
     <p class="note">Regines Anteile (Spalte „Regine“) werden mit ihrem Darlehen verrechnet – Details im Tab „Darlehen Regine“.</p>
@@ -572,7 +573,7 @@ function rUeb(m){
     {label:"Sonstiges Auto",data:L.map(k=>swMonat(k,"Ausgabe")),backgroundColor:css("--s2"),borderRadius:{topLeft:4,topRight:4},borderSkipped:"bottom"}]},options:baseOpts()});
 }
 
-let logAlle=false;
+let logAlle=false;const katOffen=new Set();function katToggle(k){katOffen.has(k)?katOffen.delete(k):katOffen.add(k);rFix($('#month').value)}
 function rUewFix(m){const box=$("#cardUewFix");box.classList.toggle("hidden",person==="claudia");if(person==="claudia")return;
   const ag=ausgleich(m),rlS=ruecklage(m).reduce((s,x)=>s+x.per.gesamt,0),dA=dauerauftrag("ausgleich_claudia",m),dR=dauerauftrag("ruecklage",m);
   const kuenftig=(art,soll)=>(D.fixkosten?.ueberweisungen?.[art]||[]).find(x=>x.ab>mEnd(m)&&Math.abs(x.betrag-soll)<0.5);
@@ -615,7 +616,11 @@ function rFix(m){
   const rowsQ=(q?rows.filter(({p})=>[p.posten,p.anbieter,p.kategorie].join(" ").toLowerCase().includes(q)):rows).filter(r=>zeigRuhend||!ruhend(r));
   let h=`<thead><tr><th>Posten</th><th>Anbieter</th><th class="n">Andre</th><th class="n">Claudia</th><th class="n">Regine</th><th class="n">Gesamt</th><th class="n">pro Jahr</th><th class="n">bisher</th><th></th></tr></thead><tbody>`,last=null;
   if(!rowsQ.length)h+=`<tr><td colspan="9">Kein Posten passt zu „${q}“.</td></tr>`;
-  rowsQ.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){h+=`<tr class="cat"><td colspan="9">${p.kategorie}</td></tr>`;last=p.kategorie}
+  const katS={};rowsQ.forEach(({p,per,beendet,kommt})=>{const k=katS[p.kategorie]=katS[p.kategorie]||{n:0,andre:0,claudi:0,mutti:0,gesamt:0};k.n++;if(!beendet&&!kommt)["andre","claudi","mutti","gesamt"].forEach(x=>k[x]+=per[x]||0)});
+  const alleKat=Object.keys(katS),auf=k=>!!q||katOffen.has(k);
+  $("#btnKat").textContent=alleKat.every(k=>katOffen.has(k))?"alle einklappen":"alle aufklappen";$("#btnKat").onclick=()=>{alleKat.every(k=>katOffen.has(k))?katOffen.clear():alleKat.forEach(k=>katOffen.add(k));rFix($("#month").value)};
+  rowsQ.forEach(({p,per,beendet,kommt})=>{if(p.kategorie!==last){const k=katS[p.kategorie],o=auf(p.kategorie);h+=`<tr class="cat katrow" role="button" tabindex="0" aria-expanded="${o}" onclick="katToggle(this.dataset.k)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();katToggle(this.dataset.k)}" data-k="${p.kategorie.replace(/"/g,"&quot;")}"><td>${o?"▾":"▸"} ${p.kategorie} <span class="pill">${k.n}</span></td><td></td><td class="n">${eur(k.andre,2)}</td><td class="n">${eur(k.claudi,2)}</td><td class="n">${k.mutti?eur(k.mutti,2):""}</td><td class="n">${eur(k.gesamt,2)}</td><td class="n">${eur(k.gesamt*12)}</td><td></td><td></td></tr>`;last=p.kategorie}
+    if(!auf(p.kategorie))return;
     const seit=per.ab>"1900"?`seit ${new Date(per.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})}`:"";
     const info=kommt?`startet ${new Date(per.ab).toLocaleDateString("de-DE")}`:beendet?`beendet ${new Date(per.bis).toLocaleDateString("de-DE")}`:per.bis?`endet ${new Date(per.bis).toLocaleDateString("de-DE")}`:seit;
     h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}${istJahr(p)?` <span class="pill">${rh(p)}</span>`:""}<span class="sub2">${istJahr(p)?`<b>${eur(jahr(per,"gesamt"),2)} im Jahr</b>${faelligTxt(p)?` (fällig ${faelligTxt(p)})`:""} · `:""}${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}${p.notiz?` · ${p.notiz}`:""}</span></td><td>${p.anbieter||""}</td>
