@@ -105,7 +105,7 @@ td{overflow-wrap:anywhere}
 .toolbar h2{margin:0}
 tr.ended td{color:var(--text-3)}
 .sub2{display:block;color:var(--text-3);font-size:12px}
-#tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2){white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}
+#tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2),#tUewFix td.n b,#tUewFix th.n{white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .form .w2{grid-column:1/-1}
 .form label{margin-top:10px}
@@ -195,6 +195,8 @@ dialog select,dialog input,dialog textarea{width:100%}
 
   <section id="tab-fix" class="hidden">
     <div class="kpis" id="kpisFix"></div>
+    <div class="card full" id="cardUewFix" style="margin-bottom:12px"><div class="toolbar"><h2>Was Andre monatlich überweist</h2><button class="btn-s" onclick="goTab('konto')">Aufstellung ansehen →</button></div>
+      <p class="hint" id="hintUewFix"></p><div class="tablewrap"><table id="tUewFix" class="resp"></table></div></div>
     <div class="grid2">
       <div class="card"><h2>Entwicklung der Fixkosten</h2><p class="hint" id="hintFixVerlauf"></p><div class="chart"><canvas id="cFixVerlauf"></canvas></div></div>
       <div class="card"><h2>Fixkosten nach Kategorie</h2><p class="hint" id="hintFix"></p><div class="donut"><div class="chart"><canvas id="cFix"></canvas></div><ul class="dleg" id="legFix"></ul></div></div>
@@ -204,7 +206,7 @@ dialog select,dialog input,dialog textarea{width:100%}
       <input type="search" id="qFix" placeholder="Posten suchen (Name, Anbieter, Kategorie)" style="width:100%;margin-bottom:8px">
       <div class="tablewrap"><table id="tFix" class="resp"></table></div></div>
     <p class="note">Regines Anteile (Spalte „Regine“) werden mit ihrem Darlehen verrechnet – Details im Tab „Darlehen Regine“.</p>
-    <div class="card full"><h2>Änderungsprotokoll</h2><p class="hint">Neueste zuerst</p><ol class="log" id="logFix" reversed></ol></div>
+    <div class="card full"><div class="toolbar"><h2>Änderungsprotokoll</h2><button class="btn-s" id="btnLog" onclick="logAlle=!logAlle;rFix($('#month').value)"></button></div><p class="hint">Neueste zuerst</p><ol class="log" id="logFix" reversed></ol></div>
   </section>
 
   <section id="tab-jahr" class="hidden">
@@ -570,7 +572,21 @@ function rUeb(m){
     {label:"Sonstiges Auto",data:L.map(k=>swMonat(k,"Ausgabe")),backgroundColor:css("--s2"),borderRadius:{topLeft:4,topRight:4},borderSkipped:"bottom"}]},options:baseOpts()});
 }
 
+let logAlle=false;
+function rUewFix(m){const box=$("#cardUewFix");box.classList.toggle("hidden",person==="claudia");if(person==="claudia")return;
+  const ag=ausgleich(m),rlS=ruecklage(m).reduce((s,x)=>s+x.per.gesamt,0),dA=dauerauftrag("ausgleich_claudia",m),dR=dauerauftrag("ruecklage",m);
+  const kuenftig=(art,soll)=>(D.fixkosten?.ueberweisungen?.[art]||[]).find(x=>x.ab>mEnd(m)&&Math.abs(x.betrag-soll)<0.5);
+  const st=(d,soll,art)=>{const k=d&&Math.abs(d.betrag-soll)>=0.5&&kuenftig(art,soll);if(k)return `<span style="color:var(--good)">✓ ab ${new Date(k.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})} angepasst (${eur(k.betrag,2)})</span>`;return st0(d,soll)};
+  const st0=(d,soll)=>!d?`<span style="color:var(--text-3)">kein Dauerauftrag bekannt</span>`:Math.abs(d.betrag-soll)<0.5?`<span style="color:var(--good)">✓ passt</span>`:`<b style="color:var(--bad)">Dauerauftrag ${d.betrag<soll?"erhöhen":"senken"} um ${eur(Math.abs(soll-d.betrag),2)}</b>`;
+  const z=(name,sub,soll,d,art)=>`<tr><td>${name}<span class="sub2">${sub}</span></td><td class="n"><b>${eur(soll,2)}</b></td><td class="n"><span>${d?`<span style="white-space:nowrap">${eur(d.betrag,2)}</span>`:"–"}${d?`<span class="sub2">${d.quelle}</span>`:""}</span></td><td class="n">${st(d,soll,art)}</td></tr>`;
+  const ist=(dA?dA.betrag:ag.netto)+(dR?dR.betrag:rlS);
+  $("#hintUewFix").textContent=`${monthName(m)} · „Soll“ ergibt sich aus den Posten unten und ändert sich automatisch mit jeder Anpassung`;
+  $("#tUewFix").innerHTML=`<thead><tr><th>Überweisung</th><th class="n">Soll laut Fixkosten</th><th class="n">Dauerauftrag</th><th class="n">Status</th></tr></thead><tbody>`+
+    z("An Claudia (Ausgleich)",`dein Anteil an Claudias Posten ${eur(ag.sA,2)} − Claudias Anteil an deinen ${eur(ag.sC,2)}`,ag.netto,dA,"ausgleich_claudia")+
+    z("Aufs Sparkonto (Rücklage)","jährliche Beiträge, die du zahlst, auf den Monat umgelegt",rlS,dR,"ruecklage")+
+    `<tr class="cat"><td>Summe pro Monat</td><td class="n">${eur(ag.netto+rlS,2)}</td><td class="n">${eur(ist,2)}</td><td></td></tr></tbody>`;labelTable($("#tUewFix"))}
 function rFix(m){
+  rUewFix(m);
   const akt=fixAktiv(m),tot=fixTotal(m),L=last12(m),vm=L[L.length-2],vj=addM(m,-12);
   const d1=tot-fixTotal(vm),d12=tot-fixTotal(vj);
   const st0=fixStart();const vor=k=>!st0||k<st0;
@@ -607,7 +623,8 @@ function rFix(m){
       <td class="n act">${beendet?"":`<button class="btn-s" onclick="openEdit('${p.id}')" aria-label="${p.posten} ändern">✎</button>`}</td></tr>`});
   $("#tFix").innerHTML=h+"</tbody>";labelTable($("#tFix"));
   const log=(D.fixkosten?.aenderungen||[]).slice(-30);
-  $("#logFix").innerHTML=log.slice().reverse().map(x=>`<li><strong>${new Date(x.zeit).toLocaleDateString("de-DE")}</strong> · ${x.beschreibung}${x.von?` <span class="sub2">von ${x.von}</span>`:""}</li>`).join("")||"<li>Noch keine Änderungen.</li>";
+  const logR=log.slice().reverse(),logN=logAlle?logR.length:5;$("#btnLog").classList.toggle("hidden",logR.length<=5);$("#btnLog").textContent=logAlle?"nur die letzten 5":`alle ${logR.length} anzeigen`;$("#logFix").start=logR.length;
+  $("#logFix").innerHTML=logR.slice(0,logN).map(x=>`<li><strong>${x.zeit||x.datum?new Date(x.zeit||x.datum).toLocaleDateString("de-DE"):"ohne Datum"}</strong> · ${x.beschreibung}${x.von?` <span class="sub2">von ${x.von}</span>`:""}</li>`).join("")||"<li>Noch keine Änderungen.</li>";
 }
 
 function kmPer100(m){
