@@ -107,7 +107,7 @@ tr.ended td{color:var(--text-3)}
 .sub2{display:block;color:var(--text-3);font-size:12px}
 .klappkopf{cursor:pointer;user-select:none}.klappkopf::before{content:"▾ ";color:var(--text-3)}.klapp.zu .klappkopf::before{content:"▸ "}.klapp.zu .klappkopf{margin-bottom:2px}
 .klapp.zu>:not(.toolbar):not(.klappkopf):not(.hint){display:none}
-#tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2),#tUewFix td.n b,#tUewFix th.n{white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}#tFix tr.katrow{cursor:pointer}#tFix tr.katrow:hover td{background:var(--surface-2)}
+#tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2),#tUewFix td.n b,#tUewFix th.n{white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}#tFix tr.katrow{cursor:pointer}.uewSt{display:inline-flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}.uewSt .btn-s{white-space:nowrap}#tFix tr.katrow:hover td{background:var(--surface-2)}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .form .w2{grid-column:1/-1}
 .form label{margin-top:10px}
@@ -585,8 +585,8 @@ function rUewFix(m){const box=$("#cardUewFix");box.classList.toggle("hidden",per
   const kuenftig=(art,soll)=>(D.fixkosten?.ueberweisungen?.[art]||[]).find(x=>x.ab>mEnd(m)&&Math.abs(x.betrag-soll)<0.5);
   const st=(d,soll,art)=>{const k=d&&Math.abs(d.betrag-soll)>=0.5&&kuenftig(art,soll);if(k)return `<span style="color:var(--good)">✓ ab ${new Date(k.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})} angepasst (${eur(k.betrag,2)})</span>`;return st0(d,soll)};
   const st0=(d,soll)=>!d?`<span style="color:var(--text-3)">kein Dauerauftrag bekannt</span>`:Math.abs(d.betrag-soll)<0.5?`<span style="color:var(--good)">✓ passt</span>`:`<b style="color:var(--bad)">Dauerauftrag ${d.betrag<soll?"erhöhen":"senken"} um ${eur(Math.abs(soll-d.betrag),2)}</b>`;
-  const okBtn=(d,soll,art)=>d&&Math.abs(d.betrag-soll)>=0.5&&!kuenftig(art,soll)&&person!=="claudia"?`<br><button class="btn-s" style="margin-top:4px" onclick="daBestaetigen('${art}',${Math.round(soll*100)/100})">✓ Schon angepasst</button>`:"";
-  const z=(name,sub,soll,d,art)=>`<tr><td>${name}<span class="sub2">${sub}</span></td><td class="n"><b>${eur(soll,2)}</b></td><td class="n"><span>${d?`<span style="white-space:nowrap">${eur(d.betrag,2)}</span>`:"–"}${d?`<span class="sub2">${d.quelle}</span>`:""}</span></td><td class="n">${st(d,soll,art)}${okBtn(d,soll,art)}</td></tr>`;
+  const okBtn=(d,soll,art)=>d&&Math.abs(d.betrag-soll)>=0.5&&!kuenftig(art,soll)&&person!=="claudia"?`<button class="btn-s" onclick="daBestaetigen('${art}',${Math.round(soll*100)/100})">✓ Schon angepasst</button>`:"";
+  const z=(name,sub,soll,d,art)=>`<tr><td>${name}<span class="sub2">${sub}</span></td><td class="n"><b>${eur(soll,2)}</b></td><td class="n"><span>${d?`<span style="white-space:nowrap">${eur(d.betrag,2)}</span>`:"–"}${d?`<span class="sub2">${d.quelle}</span>`:""}</span></td><td class="n"><span class="uewSt">${st(d,soll,art)}${okBtn(d,soll,art)}</span></td></tr>`;
   const ist=(dA?dA.betrag:ag.netto)+(dR?dR.betrag:rlS);
   $("#hintUewFix").textContent=`${monthName(m)} · „Soll“ ergibt sich aus den Posten unten und ändert sich automatisch mit jeder Anpassung`;
   $("#tUewFix").innerHTML=`<thead><tr><th>Überweisung</th><th class="n">Soll laut Fixkosten</th><th class="n">Dauerauftrag</th><th class="n">Status</th></tr></thead><tbody>`+
