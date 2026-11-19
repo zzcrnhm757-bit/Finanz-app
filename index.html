@@ -107,7 +107,7 @@ tr.ended td{color:var(--text-3)}
 .sub2{display:block;color:var(--text-3);font-size:12px}
 .klappkopf{cursor:pointer;user-select:none}.klappkopf::before{content:"▾ ";color:var(--text-3)}.klapp.zu .klappkopf::before{content:"▸ "}.klapp.zu .klappkopf{margin-bottom:2px}
 .klapp.zu>:not(.toolbar):not(.klappkopf):not(.hint){display:none}
-#tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2),#tUewFix td.n b,#tUewFix th.n{white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}#tFix tr.katrow{cursor:pointer}.uewSt{display:inline-flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}.uewSt .btn-s{white-space:nowrap}#tFix tr.katrow:hover td{background:var(--surface-2)}
+#tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2),#tUewFix td.n b,#tUewFix th.n{white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}#tFix tr.katrow{cursor:pointer}#tUewFix tr.uewMit td{border-bottom:0}#tUewFix tr.uewAkt td{padding-top:0}#tUewFix tr.uewAkt .btn-s{white-space:normal;text-align:left}@media (max-width:560px){#tUewFix tr.uewMit{border-bottom:0;padding-bottom:0}#tUewFix tr.uewAkt{padding-top:0}#tUewFix tr.uewAkt td{display:block}#tUewFix tr.uewAkt .btn-s{width:100%;text-align:center}}#tFix tr.katrow:hover td{background:var(--surface-2)}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .form .w2{grid-column:1/-1}
 .form label{margin-top:10px}
@@ -583,10 +583,14 @@ let logAlle=false;const katOffen=new Set();function katToggle(k){katOffen.has(k)
 function rUewFix(m){const box=$("#cardUewFix");box.classList.toggle("hidden",person==="claudia");if(person==="claudia")return;
   const ag=ausgleich(m),rlS=ruecklage(m).reduce((s,x)=>s+x.per.gesamt,0),dA=dauerauftrag("ausgleich_claudia",m),dR=dauerauftrag("ruecklage",m);
   const kuenftig=(art,soll)=>(D.fixkosten?.ueberweisungen?.[art]||[]).find(x=>x.ab>mEnd(m)&&Math.abs(x.betrag-soll)<0.5);
-  const st=(d,soll,art)=>{const k=d&&Math.abs(d.betrag-soll)>=0.5&&kuenftig(art,soll);if(k)return `<span style="color:var(--good)">✓ ab ${new Date(k.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})} angepasst (${eur(k.betrag,2)})</span>`;return st0(d,soll)};
-  const st0=(d,soll)=>!d?`<span style="color:var(--text-3)">kein Dauerauftrag bekannt</span>`:Math.abs(d.betrag-soll)<0.5?`<span style="color:var(--good)">✓ passt</span>`:`<b style="color:var(--bad)">Dauerauftrag ${d.betrag<soll?"erhöhen":"senken"} um ${eur(Math.abs(soll-d.betrag),2)}</b>`;
-  const okBtn=(d,soll,art)=>d&&Math.abs(d.betrag-soll)>=0.5&&!kuenftig(art,soll)&&person!=="claudia"?`<button class="btn-s" onclick="daBestaetigen('${art}',${Math.round(soll*100)/100})">✓ Schon angepasst</button>`:"";
-  const z=(name,sub,soll,d,art)=>`<tr><td>${name}<span class="sub2">${sub}</span></td><td class="n"><b>${eur(soll,2)}</b></td><td class="n"><span>${d?`<span style="white-space:nowrap">${eur(d.betrag,2)}</span>`:"–"}${d?`<span class="sub2">${d.quelle}</span>`:""}</span></td><td class="n"><span class="uewSt">${st(d,soll,art)}${okBtn(d,soll,art)}</span></td></tr>`;
+  const mm=d=>new Date(d).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"});
+  const status=(d,soll,art)=>{const ok=d&&Math.abs(d.betrag-soll)<0.5,bank=d&&/Kontoauszug|überwiesen/.test(d.quelle||""),k=!ok&&kuenftig(art,soll);
+    if(ok&&bank)return {t:`<span style="color:var(--good)">✓ bestätigt durch Kontoauszug</span>`};
+    if(ok)return {t:`<span style="color:var(--accent)">✓ angepasst · Kontoauszug steht noch aus</span>`};
+    if(k)return {t:`<span style="color:var(--accent)">✓ ab ${mm(k.ab)} auf ${eur(k.betrag,2)} angepasst · Kontoauszug steht noch aus</span>`};
+    return {t:d?`<b style="color:var(--bad)">Dauerauftrag ${d.betrag<soll?"erhöhen":"senken"} um ${eur(Math.abs(soll-d.betrag),2)}</b>`:`<span style="color:var(--text-3)">kein Dauerauftrag bekannt</span>`,
+      btn:person!=="claudia"?`<tr class="uewAkt"><td colspan="4"><button class="btn-s" onclick="daBestaetigen('${art}',${Math.round(soll*100)/100})">✓ Dauerauftrag ist schon auf ${eur(soll,2)} angepasst</button></td></tr>`:""}};
+  const z=(name,sub,soll,d,art)=>{const S=status(d,soll,art);return `<tr${S.btn?' class="uewMit"':""}><td>${name}<span class="sub2">${sub}</span></td><td class="n"><b>${eur(soll,2)}</b></td><td class="n"><span>${d?`<span style="white-space:nowrap">${eur(d.betrag,2)}</span>`:"–"}${d?`<span class="sub2">${d.quelle}</span>`:""}</span></td><td class="n">${S.t}</td></tr>${S.btn||""}`};
   const ist=(dA?dA.betrag:ag.netto)+(dR?dR.betrag:rlS);
   $("#hintUewFix").textContent=`${monthName(m)} · „Soll“ ergibt sich aus den Posten unten und ändert sich automatisch mit jeder Anpassung`;
   $("#tUewFix").innerHTML=`<thead><tr><th>Überweisung</th><th class="n">Soll laut Fixkosten</th><th class="n">Dauerauftrag</th><th class="n">Status</th></tr></thead><tbody>`+
@@ -1313,6 +1317,11 @@ document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{person=b.data
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;if(/^\d{4}$/.test($("#month").value)){const y=$("#month").value,opts=[...$("#month").options].map(o=>o.value).filter(v=>v.startsWith(y+"-"));$("#month").value=opts[0]}document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));b.scrollIntoView({block:"nearest",inline:"center"});
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hidden",s.id!=="tab-"+tab));render()});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
+// Neue Version? Das iPhone (Home-Bildschirm) hält die Seite gern im Zwischenspeicher – beim Start und beim Zurückkehren prüfen.
+const APPV="2026-11-19b";
+async function versionCheck(){if(location.protocol!=="https:")return;try{const t=await (await fetch(location.pathname+"?vc="+Date.now(),{cache:"no-store"})).text(),v=(t.match(/const APPV="([^"]+)"/)||[])[1];
+  if(v&&v!==APPV){let n=0;try{n=+sessionStorage.getItem("finanzVc")||0;sessionStorage.setItem("finanzVc",n+1)}catch(e){}if(n<2)location.replace(location.pathname+"?v="+encodeURIComponent(v)+location.hash)}}catch(e){}}
+versionCheck();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")versionCheck()});
 if(lockInfo()){document.body.classList.add("gesperrt");$("#lock").classList.remove("hidden");entsperren(true)}else load(); // Face ID startet direkt; klappt das nicht (z. B. Safari verlangt einen Tipp), bleibt der Knopf
 </script>
 </body>
