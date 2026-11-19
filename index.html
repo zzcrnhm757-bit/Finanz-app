@@ -358,6 +358,7 @@ dialog select,dialog input,dialog textarea{width:100%}
     <div class="f-gem"><label for="zuAnteil">Claudias Anteil</label><select id="zuAnteil"><option value="0.5">50 %</option><option value="0.6667">2/3</option><option value="1">100 % (nur für Claudia)</option></select></div>
     <div class="w2"><label for="zuKat">Kategorie</label><input id="zuKat" list="zuKatList"></div>
     <div class="w2 f-gem"><label for="zuText">Beschreibung in Splitwise</label><input id="zuText"></div>
+    <div class="w2 f-gem"><label for="zuSwKat">Splitwise-Kategorie</label><select id="zuSwKat"></select></div>
   </div>
   <datalist id="zuKatList"></datalist>
   <p class="note" id="zuErr" style="color:var(--bad)"></p>
@@ -1102,6 +1103,8 @@ function openZu(id){if(id.startsWith("bar:"))return openEinz(id.slice(4));{const
   $("#zuGruppe").innerHTML=grp.map(g=>`<option>${g}</option>`).join("");
   $("#zuKatList").innerHTML=[...new Set((D.konto_andre?.buchungen||[]).map(b=>b.kategorie.replace(" (Erstattung)","")))].sort().map(k=>`<option value="${k}">`).join("");
   document.querySelector(`input[name=zuWer][value=${o.gemeinsam?"gemeinsam":"ich"}]`).checked=true;
+  const swk=[...new Set((D.splitwise_variabel?.eintraege||[]).map(e=>e.kategorie).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"de"));
+  $("#zuSwKat").innerHTML=`<option value="">automatisch${o.sw_kat?` (aktuell: ${o.sw_kat})`:""}</option>`+swk.map(k=>`<option>${k}</option>`).join("");$("#zuSwKat").value=o.sw_kategorie||"";
   $("#zuGruppe").value=o.gruppe||grp.find(g=>/lebensmittel/i.test(g))||grp[0]||"";$("#zuAnteil").value=String(o.anteil_claudia??0.5);
   $("#zuKat").value=x.kategorie.startsWith("Apple Pay (")?"":x.kategorie.replace(" (Erstattung)","");$("#zuText").value=o.beschreibung||x.empfaenger.replace(/^PayPal · /,"").replace(/^Kartenzahlung /,"");
   document.querySelectorAll("#dlgZu input[name=zuWer],#dlgZu select,#zuText").forEach(e=>e.disabled=!!gesperrt);zuId_gesperrt=!!gesperrt;zuSync();dlgZu.showModal()}
@@ -1111,6 +1114,7 @@ async function saveZu(){const x0=zuFind(zuId),x=zuId.startsWith("ap:")?{...x0,ka
       const o={...alt,datum:x.kaufdatum||x.datum,betrag:-x.betrag,empfaenger:x.empfaenger,gemeinsam:gem,zeit:new Date().toISOString().slice(0,16)};
       if(kat&&kat!==x.kategorie.replace(" (Erstattung)",""))o.kategorie=kat;else delete o.kategorie;
       if(zuId_gesperrt){o.gemeinsam=alt.gemeinsam||false}else if(gem)Object.assign(o,{gruppe:$("#zuGruppe").value,anteil_claudia:+$("#zuAnteil").value,beschreibung:$("#zuText").value.trim()||x.empfaenger});else["gruppe","anteil_claudia","beschreibung"].forEach(k=>delete o[k]);
+      if(!zuId_gesperrt&&gem){const sk=$("#zuSwKat").value;if(sk){o.sw_kategorie=sk;if(o.sw_kat!==sk)delete o.sw_kat}else delete o.sw_kategorie}
       if(o.splitwise_id){o.gemeinsam=true}
       if(!o.gemeinsam&&!o.kategorie&&!o.splitwise_id&&!o.gutschriften?.length&&!gsLink(o))delete data.buchungen[zuId];else data.buchungen[zuId]=o;data.stand=new Date().toISOString().slice(0,16);
       return `Konto: ${x.empfaenger} ${eur(-x.betrag,2)} → ${zuId_gesperrt?"(steht schon in Splitwise)":gem?"gemeinsam ("+o.gruppe+")":"nur Andre"}${o.kategorie?", Kategorie "+o.kategorie:""}`},{hinweis:"Zuordnungen von Kontobuchungen aus der App (id = Buchungs-ID aus konto_andre.json)",buchungen:{}});
