@@ -105,6 +105,8 @@ td{overflow-wrap:anywhere}
 .toolbar h2{margin:0}
 tr.ended td{color:var(--text-3)}
 .sub2{display:block;color:var(--text-3);font-size:12px}
+.klappkopf{cursor:pointer;user-select:none}.klappkopf::before{content:"▾ ";color:var(--text-3)}.klapp.zu .klappkopf::before{content:"▸ "}.klapp.zu .klappkopf{margin-bottom:2px}
+.klapp.zu>:not(.toolbar):not(.klappkopf):not(.hint){display:none}
 #tFix td.n,#tFix th.n,#tFix td:nth-child(2),#tFix th:nth-child(2),#tUewFix td.n b,#tUewFix th.n{white-space:nowrap}#tFix td.n,#tFix th.n{padding-left:8px;padding-right:8px}@media (min-width:561px){#tFix td:first-child{min-width:260px}}#tFix td.n.act{padding:0 0 0 4px}#tFix tr.katrow{cursor:pointer}#tFix tr.katrow:hover td{background:var(--surface-2)}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .form .w2{grid-column:1/-1}
@@ -267,15 +269,15 @@ dialog select,dialog input,dialog textarea{width:100%}
   <section id="tab-konto" class="hidden">
     <p class="hint" id="hintKonto" style="margin:0 0 10px"></p>
     <div class="kpis" id="kpisKonto"></div>
-    <div class="card full" id="cardUew" style="margin-bottom:12px"><h2>Monatliche Überweisungen von Andre</h2><p class="hint" id="hintUew"></p>
+    <div class="card full klapp" id="cardUew" style="margin-bottom:12px"><h2 class="klappkopf">Monatliche Überweisungen von Andre</h2><p class="hint" id="hintUew"></p>
       <div class="kpis" id="kpisUew" style="margin:0 0 8px"></div>
       <div id="boxFl" class="hidden"></div>
       <div id="boxRl" class="hidden"><h2 style="font-size:14px">Jährliche Beiträge (Rücklage)</h2><div class="tablewrap"><table id="tRl" class="resp"></table></div></div>
       <div id="boxAg" class="hidden"><h2 style="font-size:14px">Ausgleich mit Claudia</h2><div class="tablewrap"><table id="tAg" class="resp"></table></div></div>
     </div>
-    <div class="card full" id="cardEinz" style="margin-bottom:12px"><div class="toolbar"><h2>Einnahmen ohne Kontoauszug (bar)</h2><button class="btn-s" onclick="openEinz()">+ Einzahlung</button></div>
+    <div class="card full klapp" id="cardEinz" style="margin-bottom:12px"><div class="toolbar"><h2 class="klappkopf">Einnahmen ohne Kontoauszug (bar, PayPal)</h2><button class="btn-s" onclick="openEinz()">+ Einzahlung</button></div>
       <p class="hint" id="hintEinz"></p><div class="tablewrap"><table id="tEinz" class="resp"></table></div></div>
-    <div class="card full hidden" id="cardAp" style="margin-bottom:12px"><h2>Apple Pay &amp; Kurzbefehl – noch nicht im Kontoauszug</h2><p class="hint" id="hintAp"></p><div class="tablewrap"><table id="tAp" class="resp"></table></div></div>
+    <div class="card full hidden klapp" id="cardAp" style="margin-bottom:12px"><h2 class="klappkopf">Apple Pay &amp; Kurzbefehl – noch nicht im Kontoauszug</h2><p class="hint" id="hintAp"></p><div class="tablewrap"><table id="tAp" class="resp"></table></div></div>
     <div class="grid2">
       <div class="card"><h2>Rein und raus – letzte 12 Monate</h2><p class="hint">Einnahmen gegen Ausgaben vom Girokonto, ohne Umbuchungen auf eigene Konten</p><div class="legend" id="legKonto"></div><div class="chart"><canvas id="cKonto"></canvas></div></div>
       <div class="card"><h2>Eigene Ausgaben nach Kategorie</h2><p class="hint" id="hintKontoKat"></p><div class="donut"><div class="chart"><canvas id="cKontoKat"></canvas></div><ul class="dleg" id="legKontoKat"></ul></div></div>
@@ -319,13 +321,15 @@ dialog select,dialog input,dialog textarea{width:100%}
 </dialog>
 <dialog id="dlgEinz">
   <h2 style="margin:0 0 4px;font-size:17px" id="einzTitel">Einzahlung eintragen</h2>
-  <p class="note" style="margin-top:0">Bargeld oder andere Einnahmen, die nicht auf dem Kontoauszug stehen. Zählt als Einnahme von Andre im gewählten Monat.</p>
+  <p class="note" style="margin-top:0">Bargeld, PayPal o. Ä., das nicht auf dem Kontoauszug steht. Ohne Zuordnung zählt es als Einnahme – mit Zuordnung mindert es die Kosten (z. B. weitergegebenes Ticket → RB Dauerkarte, Anteil eines Freundes → Pub-Rechnung).</p>
   <div class="form">
-    <div><label for="einzDatum">Datum</label><input type="date" id="einzDatum"></div>
+    <div><label for="einzDatum">Datum</label><input type="date" id="einzDatum" onchange="einzZuOpts($('#einzZu').value)"></div>
     <div><label for="einzBetrag">Betrag (€)</label><input id="einzBetrag" inputmode="decimal" placeholder="300,00"></div>
     <div class="w2"><label for="einzText">Beschreibung</label><input id="einzText" placeholder="z. B. Fahrrad verkauft"></div>
     <div class="w2"><label for="einzKat">Kategorie</label><input id="einzKat" list="einzKatList" placeholder="Verkauf"></div>
+    <div class="w2"><label for="einzZu">Gehört zu (gegenrechnen)</label><select id="einzZu" onchange="einzZuHint()"></select></div>
   </div>
+  <p class="note" id="einzZuHinweis" style="margin:0"></p>
   <datalist id="einzKatList"><option value="Verkauf"><option value="Geschenk"><option value="Erstattung"><option value="Sonstige Einnahme"></datalist>
   <p class="note" id="einzErr" style="color:var(--bad)"></p>
   <div class="row"><button id="einzDel" style="margin-right:auto;color:var(--bad)" onclick="saveEinz(true)">Löschen</button><button onclick="dlgEinz.close()">Abbrechen</button><button class="primary" id="einzSave" onclick="saveEinz()">Speichern</button></div>
@@ -502,7 +506,7 @@ function bisher(p,m){ // angefallene Kosten dieses Postens von Beginn bis Ende d
     return s+monthsBetween(ym(x.ab),bis).length*share(x.andre,x.claudi)},0)}
 // Tabellen: Spaltennamen als data-label für die Kartenansicht am Handy
 function labelTable(t){const h=[...t.querySelectorAll("thead th")].map(x=>x.textContent);t.querySelectorAll("tbody tr").forEach(r=>[...r.children].forEach((td,i)=>{if(!td.hasAttribute("colspan"))td.dataset.label=h[i]||""}))}
-const barEin=m=>einzAlle().filter(e=>ym(e.datum)===m).reduce((s,e)=>s+e.betrag,0);
+const barEin=m=>einzEcht().filter(e=>ym(e.datum)===m).reduce((s,e)=>s+e.betrag,0);
 function andreKontoEin(m){const r=(D.konto_andre?.buchungen||[]).filter(x=>ym(x.datum)===m&&x.bereich==="Einnahme"&&x.kategorie!=="Familie"&&!gsLink(ZU()[x.id]));return r.length?r.reduce((s,x)=>s+x.betrag,0)+barEin(m):null}
 function einnahmen(m){const e=D.fixkosten?.einnahmen||{};const k=m?andreKontoEin(m):null;const a=k??((e.andre_netto||0)+(e.mieteinnahme||0)+(m?barEin(m):0)),c=e.claudi_netto||0;return share(a,c)}
 const swRows=()=>(D.splitwise?.eintraege||[]);
@@ -624,7 +628,7 @@ function rFix(m){
     if(!auf(p.kategorie))return;
     const seit=per.ab>"1900"?`seit ${new Date(per.ab).toLocaleDateString("de-DE",{month:"2-digit",year:"numeric"})}`:"";
     const info=kommt?`startet ${new Date(per.ab).toLocaleDateString("de-DE")}`:beendet?`beendet ${new Date(per.bis).toLocaleDateString("de-DE")}`:per.bis?`endet ${new Date(per.bis).toLocaleDateString("de-DE")}`:seit;
-    h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}${istJahr(p)?` <span class="pill">${rh(p)}</span>`:""}<span class="sub2">${istJahr(p)?`<b>${eur(jahr(per,"gesamt"),2)} im Jahr</b>${faelligTxt(p)?` (fällig ${faelligTxt(p)})`:""} · `:""}${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}${p.notiz?` · ${p.notiz}`:""}</span></td><td>${p.anbieter||""}</td>
+    h+=`<tr class="${beendet||kommt?"ended":""}"><td>${p.posten}${p.gemeinsam?' <span class="pill">gemeinsam</span>':""}${istJahr(p)?` <span class="pill">${rh(p)}</span>`:""}<span class="sub2">${istJahr(p)?`<b>${eur(jahr(per,"gesamt"),2)} im Jahr</b>${faelligTxt(p)?` (fällig ${faelligTxt(p)})`:""} · `:""}${info}${p.wer_zahlt?` · zahlt ${p.wer_zahlt}`:""}${p.notiz?` · ${p.notiz}`:""}${(g=>g.length?`<br><span style="color:var(--good)">↩ ${m.slice(0,4)}: ${g.length}× gegengerechnet, ${eur(g.reduce((a,e)=>a+e.betrag,0),2)}${istJahr(p)?` · netto ${eur(jahr(per,"gesamt")-g.reduce((a,e)=>a+e.betrag,0),2)} im Jahr`:""}</span>`:"")(einzFuer("p:"+p.id).filter(e=>e.datum.startsWith(m.slice(0,4))))}</span></td><td>${p.anbieter||""}</td>
       <td class="n">${eur(per.andre,2)}</td><td class="n">${eur(per.claudi,2)}</td><td class="n">${per.mutti?eur(per.mutti,2):""}</td><td class="n">${eur(per.gesamt,2)}</td><td class="n">${istJahr(p)?`<b>${eur(jahr(per,"gesamt"),2)}</b>`:eur(per.gesamt*12)}</td><td class="n">${eur(bisher(p,m))}</td>
       <td class="n act">${beendet?"":`<button class="btn-s" onclick="openEdit('${p.id}')" aria-label="${p.posten} ändern">✎</button>`}</td></tr>`});
   $("#tFix").innerHTML=h+"</tbody>";labelTable($("#tFix"));
@@ -885,10 +889,22 @@ function rVar(m){rBudget(m);
 /* ---------- Andres Girokonto (Kontoauszüge) ---------- */
 const ZU=()=>D.konto_zuordnung&&!D.konto_zuordnung.error?D.konto_zuordnung.buchungen||{}:{};
 const einzAlle=()=>D.fixkosten?.einzahlungen||[];
-const barRows=()=>einzAlle().map(e=>({id:"bar:"+e.id,datum:e.datum,betrag:e.betrag,empfaenger:e.text||"Bareinnahme",bereich:"Einnahme",kategorie:e.kategorie||"Bareinnahme",zweck:"bar / ohne Konto – von Hand eingetragen",bar:true}));
+// Einzahlung „gehört zu“: b:<Kontobuchung> · ap:<Apple-Pay-Eintrag> · p:<Fixkosten-Posten> · k:<Kategorie> → mindert Kosten statt Einnahme
+const einzZuName=z=>{if(!z)return "";const t=z.slice(z.indexOf(":")+1);
+  if(z.startsWith("p:"))return (D.fixkosten?.posten||[]).find(p=>p.id===t)?.posten||t;
+  if(z.startsWith("k:"))return t;
+  if(z.startsWith("ap:")){const e=apAlle().find(e=>e.id===t);return e?`${e.haendler} ${new Date(e.datum).toLocaleDateString("de-DE")}`:"Apple-Pay-Zahlung"}
+  const b=(D.konto_andre?.buchungen||[]).find(b=>b.id===t);return b?`${b.empfaenger} ${new Date(b.datum).toLocaleDateString("de-DE")}`:"Buchung"};
+const einzZuKat=z=>{const t=z.slice(z.indexOf(":")+1);if(z.startsWith("p:"))return einzZuName(z);if(z.startsWith("k:"))return t;
+  if(z.startsWith("ap:"))return ZU()[z]?.kategorie||"Sonstiges";const b=(D.konto_andre?.buchungen||[]).find(b=>b.id===t);return b?(ZU()[b.id]?.kategorie||b.kategorie):"Sonstiges"};
+const einzEcht=()=>einzAlle().filter(e=>!e.gehoert_zu);
+const barRows=()=>einzAlle().map(e=>e.gehoert_zu?{id:"bar:"+e.id,datum:e.datum,betrag:e.betrag,empfaenger:e.text||"Ausgleich",bereich:e.gehoert_zu.startsWith("p:")?"Fixkosten":"Ausgabe",kategorie:einzZuKat(e.gehoert_zu).replace(" (Erstattung)","")+" (Erstattung)",zweck:"bar / PayPal – von Hand eingetragen",bar:true,gutschrift_zu:einzZuName(e.gehoert_zu)}
+  :{id:"bar:"+e.id,datum:e.datum,betrag:e.betrag,empfaenger:e.text||"Bareinnahme",bereich:"Einnahme",kategorie:e.kategorie||"Bareinnahme",zweck:"bar / ohne Konto – von Hand eingetragen",bar:true});
+const einzFuer=z=>einzAlle().filter(e=>e.gehoert_zu===z);
 const gsLink=o=>o&&(o.gutschrift_fuer||o.gutschrift_kat);
 const kRows=()=>{const z=ZU(),bu=D.konto_andre?.buchungen||[],byId=Object.fromEntries(bu.map(b=>[b.id,b])),gs={};
   Object.entries(z).forEach(([id,o])=>{const c=byId[id];if(c&&o.gutschrift_fuer){const l=[].concat(o.gutschrift_fuer);l.forEach(i=>(gs[i]=gs[i]||[]).push({betrag:c.betrag,von:c.empfaenger,datum:c.datum,notiz:o.notiz,teil:l.length}))}});
+  einzAlle().forEach(e=>{const g=e.gehoert_zu;if(!g||g.startsWith("p:")||g.startsWith("k:"))return;const k=g.startsWith("b:")?g.slice(2):g;(gs[k]=gs[k]||[]).push({betrag:e.betrag,von:e.text||"bar",datum:e.datum,teil:1})});
   const swUsed=new Set(bu.map(b=>b.splitwise?.id).filter(Boolean));
   return bu.concat(barRows()).map(x=>{const o0=z[x.id],o=o0||(x.applepay&&z["ap:"+x.applepay.id]);let y=x;
   if(o){y={...x,zu:o};if(o.kategorie)y.kategorie=o.kategorie;
@@ -896,7 +912,8 @@ const kRows=()=>{const z=ZU(),bu=D.konto_andre?.buchungen||[],byId=Object.fromEn
   if(gsLink(o0)&&x.betrag>0){const ts=[].concat(o0.gutschrift_fuer||[]).map(i=>byId[i]).filter(Boolean),t=ts[0],tk=t?(z[t.id]?.kategorie||t.kategorie):o0.gutschrift_kat||"Sonstiges",su=ts.reduce((a,b)=>a-b.betrag,0);
     y={...y,zu:o0,bereich:t?.bereich||"Ausgabe",kategorie:tk.replace(" (Erstattung)","")+" (Erstattung)",gutschrift_zu:ts.length>1?`${ts.length} Rechnungen (${eur(su,2)}, nicht erstattet ${eur(su-x.betrag,2)})`:t?t.empfaenger:tk,gutschrift_notiz:o0.notiz}}
   const man=o0?.gutschriften||[];
-  if(gs[x.id]||man.length){y={...y,gutschriften:[...(gs[x.id]||[]),...man.map(g=>({...g,manuell:true}))]};
+  const gsx=[...(gs[x.id]||[]),...(x.applepay?gs["ap:"+x.applepay.id]||[]:[])];
+  if(gsx.length||man.length){y={...y,gutschriften:[...gsx,...man.map(g=>({...g,manuell:true}))]};
     const s=man.reduce((a,g)=>a+g.betrag,0);
     if(s){y.betrag_beleg=x.betrag;y.betrag=Math.round((x.betrag+s)*100)/100;
       if(!y.splitwise&&y.betrag<0){const e=(D.splitwise_variabel?.eintraege||[]).concat(D.splitwise?.eintraege||[]).find(e=>e.bezahlt_von==="Andre"&&e.typ!=="Ausgleich"&&!swUsed.has(e.id)&&Math.abs(e.kosten+y.betrag)<=.02&&Math.abs(new Date(e.datum)-new Date(x.datum))<=14*864e5);
@@ -909,7 +926,7 @@ const KB=[["Einnahme","Einnahmen","--good"],["Fixkosten","Fixkosten","--s1"],["L
 const kBer=x=>x.bereich==="Ausgabe"&&x.splitwise?"Splitwise":x.bereich;
 let kFilter="alle";
 function kSum(m,b){return kRows().filter(x=>ym(x.datum)===m&&kBer(x)===b).reduce((s,x)=>s+x.betrag,0)}
-function rKonto(m){rUew(m);rAp();rEinz(m);
+function rKonto(m){klappInit();rUew(m);rAp();rEinz(m);
   if(!kRows().length){$("#kpisKonto").innerHTML=kpi("Andres Konto","–","Noch keine Kontoauszüge eingelesen.");return}
   const ms=[...new Set(kRows().map(x=>ym(x.datum)))].sort(),bis=ms.at(-1);
   const lk=(D.konto_andre.luecken||[]).length?` · ⚠︎ Auszug fehlt ${D.konto_andre.luecken.join(", ")}`:"";
@@ -1088,6 +1105,7 @@ const zuSync=()=>{const g=document.querySelector('input[name=zuWer]:checked').va
 document.querySelectorAll('input[name=zuWer]').forEach(r=>r.onchange=zuSync);
 const apAlle=()=>D.applepay&&!D.applepay.error?D.applepay.eintraege||[]:[];
 function apPseudo(e){const o=ZU()["ap:"+e.id];const x={id:"ap:"+e.id,datum:e.datum.slice(0,10),betrag:-e.betrag,empfaenger:e.haendler||"Apple Pay",bereich:"Ausgabe",kategorie:o?.kategorie||"Apple Pay (noch offen)",zweck:(e.quelle==="manuell"?`Kurzbefehl „Ausgabe“${e.notiz?" · "+e.notiz:""}`:e.karte?`Apple Pay · ${e.karte}`:"Apple Pay")+(e.waehrung?` · ${num(e.betrag_orig,2)} ${e.waehrung}${e.kurs?` (Kurs ${num(e.kurs,4)})`:" (Kurs folgt)"}`:"")};
+  const ein=einzFuer("ap:"+e.id);if(ein.length)x.zweck+=` · ↩ Ausgleich ${ein.map(g=>`${eur(g.betrag,2)} (${g.text||"bar"})`).join(", ")}, netto ${eur(e.betrag-ein.reduce((a,g)=>a+g.betrag,0),2)}`;
   if(o){x.zu=o;if(o.gemeinsam)x.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(e.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id}}return x}
 const zuFind=id=>id.startsWith("ap:")?(e=>e&&apPseudo(e))(apAlle().find(e=>"ap:"+e.id===id)):kRows().find(b=>b.id===id);
 function rAp(){const m=$("#month").value,imKonto=new Set((D.konto_andre?.buchungen||[]).filter(b=>b.applepay).map(b=>b.applepay.id));
@@ -1154,11 +1172,17 @@ async function saveGs(){const x=gsRaw(gsId),haben=x.betrag>0;const b=parseFloat(
 
 /* ---------- Einzahlungen ohne Konto ---------- */
 let einzId=null;
+const KLAPP_ST=["cardUew","cardEinz","cardAp"];let klappOffen=new Set();try{klappOffen=new Set(JSON.parse(localStorage.getItem("finanzKlappOffen")||"[]"))}catch(e){}
+function klappInit(){KLAPP_ST.forEach(id=>{const c=$("#"+id);if(!c||c.dataset.k)return;c.dataset.k=1;c.classList.toggle("zu",!klappOffen.has(id));
+  const h=c.querySelector(".klappkopf");h.setAttribute("role","button");h.tabIndex=0;h.setAttribute("aria-expanded",String(klappOffen.has(id)));
+  const t=()=>{const zu=c.classList.toggle("zu");zu?klappOffen.delete(id):klappOffen.add(id);h.setAttribute("aria-expanded",String(!zu));try{localStorage.setItem("finanzKlappOffen",JSON.stringify([...klappOffen]))}catch(e){}};
+  h.addEventListener("click",t);h.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();t()}})})}
 function rEinz(m){const E=einzAlle(),y=m.slice(0,4),ey=E.filter(e=>e.datum.startsWith(y));
   $("#cardEinz").classList.toggle("hidden",person==="claudia");
-  $("#hintEinz").textContent=E.length?`${y}: ${ey.length} Einzahlung${ey.length===1?"":"en"}, ${eur(ey.reduce((s,e)=>s+e.betrag,0),2)} · zählen als Einnahme von Andre (Übersicht, Andres Konto, Jahresrückblick) · antippen zum Ändern`:"Noch keine – z. B. Bargeld aus einem Verkauf über „+ Einzahlung“ eintragen.";
+  const ec=ey.filter(e=>!e.gehoert_zu),eg=ey.filter(e=>e.gehoert_zu);
+  $("#hintEinz").textContent=E.length?`${y}: ${eur(ec.reduce((s,e)=>s+e.betrag,0),2)} Einnahmen (${ec.length})${eg.length?` · ${eur(eg.reduce((s,e)=>s+e.betrag,0),2)} gegengerechnet (${eg.length})`:""} · antippen zum Ändern oder Zuordnen`:"Noch keine – z. B. Bargeld aus einem Verkauf über „+ Einzahlung“ eintragen.";
   $("#tEinz").innerHTML=E.length?`<thead><tr><th>Einnahme</th><th class="n">Betrag</th></tr></thead><tbody>`+[...E].sort((a,b)=>b.datum.localeCompare(a.datum)).map(e=>
-    `<tr style="cursor:pointer" onclick="openEinz('${e.id}')"><td>${e.text||"Bareinnahme"}<span class="sub2">${new Date(e.datum).toLocaleDateString("de-DE")} · ${e.kategorie||"Bareinnahme"}</span></td><td class="n pos">+${eur(e.betrag,2)}</td></tr>`).join("")+"</tbody>":"";
+    `<tr style="cursor:pointer" onclick="openEinz('${e.id}')"><td>${e.text||"Bareinnahme"}<span class="sub2">${new Date(e.datum).toLocaleDateString("de-DE")} · ${e.gehoert_zu?`<span style="color:var(--good)">↩ gegengerechnet: ${einzZuName(e.gehoert_zu)}</span>`:e.kategorie||"Bareinnahme"}</span></td><td class="n pos">+${eur(e.betrag,2)}</td></tr>`).join("")+"</tbody>":"";
   if(E.length)labelTable($("#tEinz"))}
 function kmLetzter(){return [...(D.km?.eintraege||[])].sort((a,b)=>a.datum<b.datum?-1:1).at(-1)}
 function rKmStand(){const l=kmLetzter();$("#kmStand").textContent=l?`Letzter Kilometerstand: ${l.km.toLocaleString("de-DE")} km am ${new Date(l.datum).toLocaleDateString("de-DE")}${l.notiz?" · "+l.notiz:""}`:"Noch kein Kilometerstand eingetragen"}
@@ -1172,16 +1196,30 @@ async function saveKm(){const datum=$("#kmDatum").value,km=Math.round(+$("#kmWer
 function openEinz(id){const e=id&&einzAlle().find(x=>x.id===id);einzId=e?e.id:null;$("#einzErr").textContent="";
   $("#einzTitel").textContent=e?"Einzahlung ändern":"Einzahlung eintragen";$("#einzDel").classList.toggle("hidden",!e);
   $("#einzDatum").value=e?.datum||new Date().toISOString().slice(0,10);$("#einzBetrag").value=e?String(e.betrag).replace(".",","):"";
-  $("#einzText").value=e?.text||"";$("#einzKat").value=e?.kategorie||"Verkauf";dlgEinz.showModal()}
+  $("#einzText").value=e?.text||"";$("#einzKat").value=e?.kategorie||"Verkauf";einzZuOpts(e?.gehoert_zu||"");dlgEinz.showModal()}
+function einzZuOpts(sel){const s=$("#einzZu"),d0=new Date($("#einzDatum").value||Date.now()),ms=864e5,nah=d=>Math.abs(d0-new Date(d))/ms<=60;s.innerHTML="";
+  s.add(new Option("— nichts, ist eine echte Einnahme —",""));
+  const grp=(l,o)=>{if(!o.length)return;const g=document.createElement("optgroup");g.label=l;o.forEach(([t,v])=>g.append(new Option(t,v)));s.append(g)};
+  const m=ym($("#einzDatum").value||new Date().toISOString());
+  grp("Fixkosten-Posten",fixAktiv(m).map(({p})=>[p.posten+(p.anbieter?` (${p.anbieter})`:""),"p:"+p.id]).sort((a,b)=>a[0].localeCompare(b[0],"de")));
+  const imKonto=new Set((D.konto_andre?.buchungen||[]).filter(b=>b.applepay).map(b=>b.applepay.id));
+  const zl=[...apAlle().filter(e=>!imKonto.has(e.id)&&nah(e.datum)).map(e=>[e.datum.slice(0,10),`${e.haendler} · ${eur(e.betrag,2)}`,"ap:"+e.id]),
+    ...(D.konto_andre?.buchungen||[]).filter(b=>b.betrag<0&&["Ausgabe","Fixkosten","Laden"].includes(b.bereich)&&nah(b.datum)).map(b=>[b.datum,`${b.empfaenger} · ${eur(-b.betrag,2)}`,"b:"+b.id])]
+    .sort((a,b)=>b[0].localeCompare(a[0])).map(([d,t,v])=>[`${new Date(d).toLocaleDateString("de-DE")} ${t}`,v]);
+  grp("Zahlung (± 60 Tage)",zl);
+  grp("Kategorie",[...new Set(kRows().filter(b=>b.bereich==="Ausgabe"&&b.betrag<0).map(b=>b.kategorie.replace(" (Erstattung)","")))].sort().map(k=>[k,"k:"+k]));
+  if(sel&&![...s.options].some(o=>o.value===sel))s.add(new Option(einzZuName(sel),sel));
+  s.value=sel;einzZuHint()}
+function einzZuHint(){const v=$("#einzZu").value;$("#einzZuHinweis").textContent=v?`Zählt nicht als Einnahme, sondern mindert „${einzZuName(v)}“.`:"Zählt als Einnahme von Andre."}
 async function saveEinz(loeschen){const datum=$("#einzDatum").value,betrag=+$("#einzBetrag").value.replace(/[^\d,.]/g,"").replace(/\.(?=\d{3})/g,"").replace(",","."),text=$("#einzText").value.trim(),kat=$("#einzKat").value.trim()||"Sonstige Einnahme";
   if(!loeschen&&(!datum||!(betrag>0))){$("#einzErr").textContent="Bitte Datum und Betrag angeben.";return}
   if(loeschen&&!confirm("Diese Einzahlung löschen?"))return;
   $("#einzSave").disabled=true;$("#einzErr").textContent="Speichere …";
   try{await commitFix(f=>{f.einzahlungen=f.einzahlungen||[];
       if(loeschen){const x=f.einzahlungen.find(z=>z.id===einzId);f.einzahlungen=f.einzahlungen.filter(z=>z.id!==einzId);return `Einzahlung gelöscht: ${x?.text||""} ${eur(x?.betrag||0,2)}`}
-      const o={id:einzId||Date.now().toString(36),datum,betrag:Math.round(betrag*100)/100,text,kategorie:kat};
+      const o={id:einzId||Date.now().toString(36),datum,betrag:Math.round(betrag*100)/100,text,kategorie:kat};const zu=$("#einzZu").value;if(zu)o.gehoert_zu=zu;
       const i=f.einzahlungen.findIndex(z=>z.id===o.id);i>=0?f.einzahlungen[i]=o:f.einzahlungen.push(o);
-      return `Einzahlung ${new Date(datum).toLocaleDateString("de-DE")}: ${text||kat} +${eur(o.betrag,2)}`});
+      return `Einzahlung ${new Date(datum).toLocaleDateString("de-DE")}: ${text||kat} +${eur(o.betrag,2)}${zu?` → gegengerechnet mit ${einzZuName(zu)}`:""}`});
     dlgEinz.close();render()}catch(e){$("#einzErr").textContent=e.message}finally{$("#einzSave").disabled=false}}
 
 /* ---------- Jahresrückblick ---------- */
