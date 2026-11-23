@@ -1123,7 +1123,9 @@ let zuId=null,zuId_gesperrt=false;
 const zuSync=()=>{const g=document.querySelector('input[name=zuWer]:checked').value==="gemeinsam";document.querySelectorAll("#dlgZu .f-gem").forEach(e=>e.classList.toggle("hidden",!g))};
 document.querySelectorAll('input[name=zuWer]').forEach(r=>r.onchange=zuSync);
 const apAlle=()=>D.applepay&&!D.applepay.error?D.applepay.eintraege||[]:[];
-function apPseudo(e){const o=ZU()["ap:"+e.id];const x={id:"ap:"+e.id,datum:e.datum.slice(0,10),betrag:-e.betrag,empfaenger:e.haendler||"Apple Pay",bereich:"Ausgabe",kategorie:o?.kategorie||"Apple Pay (noch offen)",zweck:(e.quelle==="manuell"?`Kurzbefehl „Ausgabe“${e.notiz?" · "+e.notiz:""}`:e.karte?`Apple Pay · ${e.karte}`:"Apple Pay")+(e.waehrung?` · ${num(e.betrag_orig,2)} ${e.waehrung}${e.kurs?` (Kurs ${num(e.kurs,4)})`:" (Kurs folgt)"}`:"")};
+// Kurzbefehl-Einträge, die schon in Splitwise stehen: Betrag aus Splitwise übernehmen (dort nachträglich geändert)
+const swBetrag=id=>{if(!id)return null;const e=(D.splitwise_variabel?.eintraege||[]).concat(D.splitwise?.eintraege||[]).find(e=>e.id===id);return e?e.kosten:null};
+function apPseudo(e){const o=ZU()["ap:"+e.id];const sb=e.quelle==="manuell"?swBetrag(o?.splitwise_id):null;if(sb!=null&&Math.abs(sb-e.betrag)>=0.01)e={...e,betrag:sb,betrag_sw:true};const x={id:"ap:"+e.id,datum:e.datum.slice(0,10),betrag:-e.betrag,empfaenger:e.haendler||"Apple Pay",bereich:"Ausgabe",kategorie:o?.kategorie||"Apple Pay (noch offen)",zweck:(e.quelle==="manuell"?`Kurzbefehl „Ausgabe“${e.notiz?" · "+e.notiz:""}`:e.karte?`Apple Pay · ${e.karte}`:"Apple Pay")+(e.betrag_sw?" · Betrag aus Splitwise übernommen":"")+(e.waehrung?` · ${num(e.betrag_orig,2)} ${e.waehrung}${e.kurs?` (Kurs ${num(e.kurs,4)})`:" (Kurs folgt)"}`:"")};
   const ein=einzFuer("ap:"+e.id);if(ein.length)x.zweck+=` · ↩ Ausgleich ${ein.map(g=>`${eur(g.betrag,2)} (${g.text||"bar"})`).join(", ")}, netto ${eur(e.betrag-ein.reduce((a,g)=>a+g.betrag,0),2)}`;
   if(o){x.zu=o;if(o.gemeinsam)x.splitwise={gruppe:o.gruppe,anteil_andre:Math.round(e.betrag*(1-(o.anteil_claudia??.5))*100)/100,geplant:!o.splitwise_id}}return x}
 const zuFind=id=>id.startsWith("ap:")?(e=>e&&apPseudo(e))(apAlle().find(e=>"ap:"+e.id===id)):kRows().find(b=>b.id===id);
@@ -1318,7 +1320,7 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hidden",s.id!=="tab-"+tab));render()});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
 // Neue Version? Das iPhone (Home-Bildschirm) hält die Seite gern im Zwischenspeicher – beim Start und beim Zurückkehren prüfen.
-const APPV="2026-11-19b";
+const APPV="2026-11-23a";
 async function versionCheck(){if(location.protocol!=="https:")return;try{const t=await (await fetch(location.pathname+"?vc="+Date.now(),{cache:"no-store"})).text(),v=(t.match(/const APPV="([^"]+)"/)||[])[1];
   if(v&&v!==APPV){let n=0;try{n=+sessionStorage.getItem("finanzVc")||0;sessionStorage.setItem("finanzVc",n+1)}catch(e){}if(n<2)location.replace(location.pathname+"?v="+encodeURIComponent(v)+location.hash)}}catch(e){}}
 versionCheck();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")versionCheck()});
